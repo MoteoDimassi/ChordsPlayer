@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ChordsPlayer - Воспроизведение гитарных аккордов</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ChordsPlayer</h1>
+            <p>Веб-приложение для воспроизведения гитарных аккордов</p>
+        </header>
+        
+        <main>
+            <section class="chord-input-section">
+                <h2>Выбор аккорда</h2>
+                <div class="input-container">
+                    <div class="autocomplete-container">
+                        <input type="text" id="chordInput" placeholder="Введите аккорд (например: C, Am, F#m7)" autocomplete="off">
+                        <div id="autocompleteList" class="autocomplete-list"></div>
+                    </div>
+                    <button id="playButton" class="play-button">
+                        <span class="icon">▶</span>
+                        <span class="text">Play</span>
+                    </button>
+                    <button id="stopButton" class="stop-button" disabled>
+                        <span class="icon">■</span>
+                        <span class="text">Stop</span>
+                    </button>
+                </div>
+                <div id="chordInfo" class="chord-info"></div>
+            </section>
+            
+            <section class="fretboard-section">
+                <h2>Аппликатура аккорда</h2>
+                <div class="fretboard-container">
+                    <svg id="fretboard" width="600" height="200" viewBox="0 0 600 200">
+                        <!-- Гриф гитары будет отрисован здесь с помощью JavaScript -->
+                    </svg>
+                </div>
+                <div id="fingeringInfo" class="fingering-info"></div>
+            </section>
+            
+            <section class="status-section">
+                <h2>Статус воспроизведения</h2>
+                <div class="status-container">
+                    <div class="status-indicator" id="statusIndicator">
+                        <div class="status-dot"></div>
+                        <span class="status-text">Готов к работе</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" id="progressBar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+                </div>
+            </section>
+            
+            <section class="log-section">
+                <h2>Журнал запросов</h2>
+                <div class="log-container">
+                    <div class="log-controls">
+                        <button id="clearLogButton" class="clear-button">Очистить</button>
+                        <button id="exportLogButton" class="export-button">Экспорт</button>
+                    </div>
+                    <div id="logContent" class="log-content"></div>
+                </div>
+            </section>
+        </main>
+        
+        <footer>
+            <p>ChordsPlayer &copy; 2023 - Веб-приложение для воспроизведения гитарных аккордов</p>
+        </footer>
+    </div>
+    
+    <!-- Подключение модулей -->
+    <script src="chordParser.js"></script>
+    <script src="chordMatcher.js"></script>
+    <script src="chordOptimizer.js"></script>
+    <script src="audioMapper.js"></script>
+    <script src="audioBufferCache.js"></script>
+    <script src="pitchShift.js"></script>
+    <script src="synchronousPlayback.js"></script>
+    
+    <!-- Основной скрипт приложения -->
+    <script src="app.js"></script>
+</body>
+</html>

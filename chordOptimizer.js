@@ -1,0 +1,746 @@
+/**
+ * Модуль для поиска оптимальной аппликатуры аккорда на гитаре
+ * Реализует эвристический алгоритм с учетом ограничений:
+ * - Максимум растяжения между ладами (рекомендовано: 4)
+ * - Минимальное количество пальцев
+ * - Приоритет открытых струн
+ */
+
+// Загрузка данных о нотах (в реальном приложении это может быть загружено из файла)
+const OPTIMIZER_NOTES_DATA = {
+  "6E": ["E1", "F1", "F#1", "G1", "G#1"],
+  "5A": ["A1", "A#1", "B1", "C2", "C#2"],
+  "4D": ["D2", "D#2", "E2", "F2", "F#2"],
+  "3G": ["G2", "G#2", "A2", "A#2", "B2"],
+  "2B": ["B2", "C2", "C#2", "D2", "D#2"],
+  "1e": ["E3", "F3", "F#3", "G3", "G#3"]
+};
+
+// Порядок струн от самой низкой к самой высокой
+const STRINGS_ORDER = ["6E", "5A", "4D", "3G", "2B", "1e"];
+
+// Веса для оценочной функции
+const SCORE_WEIGHTS = {
+  fretRange: -2.0,      // Штраф за широкий диапазон ладов
+  openStrings: 1.5,     // Бонус за открытые струны
+  barreChords: -1.0,    // Штраф за аккорды с баррэ
+  standardChords: 2.0    // Бонус за соответствие стандартным аппликатурам
+};
+
+// Стандартные аппликатуры для базовых аккордов (для бонуса в оценочной функции)
+const STANDARD_CHORDS = {
+  "C": [
+    { string: "6E", fret: -1, note: null }, // Mute
+    { string: "5A", fret: 3, note: "C" },
+    { string: "4D", fret: 2, note: "E" },
+    { string: "3G", fret: 0, note: "G" },
+    { string: "2B", fret: 1, note: "C" },
+    { string: "1e", fret: 0, note: "E" }
+  ],
+  "G": [
+    { string: "6E", fret: 3, note: "G" },
+    { string: "5A", fret: 2, note: "B" },
+    { string: "4D", fret: 0, note: "D" },
+    { string: "3G", fret: 0, note: "G" },
+    { string: "2B", fret: 0, note: "B" },
+    { string: "1e", fret: 3, note: "G" }
+  ],
+  "D": [
+    { string: "6E", fret: -1, note: null }, // Mute
+    { string: "5A", fret: -1, note: null }, // Mute
+    { string: "4D", fret: 0, note: "D" },
+    { string: "3G", fret: 2, note: "A" },
+    { string: "2B", fret: 3, note: "D" },
+    { string: "1e", fret: 2, note: "F#" }
+  ],
+  "Am": [
+    { string: "6E", fret: -1, note: null }, // Mute
+    { string: "5A", fret: 0, note: "A" },
+    { string: "4D", fret: 2, note: "E" },
+    { string: "3G", fret: 2, note: "A" },
+    { string: "2B", fret: 1, note: "C" },
+    { string: "1e", fret: 0, note: "E" }
+  ],
+  "Em": [
+    { string: "6E", fret: 0, note: "E" },
+    { string: "5A", fret: 2, note: "B" },
+    { string: "4D", fret: 2, note: "E" },
+    { string: "3G", fret: 0, note: "G" },
+    { string: "2B", fret: 0, note: "B" },
+    { string: "1e", fret: 0, note: "E" }
+  ]
+};
+
+/**
+ * Извлекает имя ноты без октавы
+ * @param {string} noteWithOctave - Нота с октавой (например, "C#4")
+ * @returns {string} - Имя ноты без октавы (например, "C#")
+ */
+function extractNoteName(noteWithOctave) {
+  return noteWithOctave.replace(/[0-9]/g, '');
+}
+
+/**
+ * Находит все возможные позиции для каждой ноты аккорда
+ * @param {Array} chordNotes - Ноты аккорда (без октав)
+ * @returns {Object} - Словарь: note -> [ {string, fret, note} ]
+ */
+function findAllPossiblePositions(chordNotes) {
+  const result = {};
+  
+  // Инициализируем результат пустыми массивами для каждой ноты
+  chordNotes.forEach(note => {
+    result[note] = [];
+  });
+  
+  // Проходим по каждой струне
+  Object.keys(OPTIMIZER_NOTES_DATA).forEach(string => {
+    // Проходим по каждому ладу от 0 до 4
+    OPTIMIZER_NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+      const noteName = extractNoteName(noteWithOctave);
+      
+      // Проверяем, является ли нота частью аккорда
+      if (chordNotes.includes(noteName)) {
+        // Добавляем позицию в результат
+        result[noteName].push({
+          string: string,
+          fret: fret,
+          note: noteName
+        });
+      }
+    });
+  });
+  
+  return result;
+}
+
+/**
+ * Генерирует все возможные комбинации позиций для аккорда
+ * @param {Object} positionsByNote - Словарь: note -> [ {string, fret, note} ]
+ * @param {Array} chordNotes - Ноты аккорда
+ * @returns {Array} - Массив всех возможных аппликатур
+ */
+function generateAllCombinations(positionsByNote, chordNotes) {
+  const combinations = [];
+  
+  // Рекурсивная функция для генерации комбинаций
+  function generateCombination(currentCombination, remainingNotes) {
+    if (remainingNotes.length === 0) {
+      // Создаем полную аппликатуру для всех 6 струн
+      const fullFingering = createFullFingering(currentCombination);
+      combinations.push(fullFingering);
+      return;
+    }
+    
+    const currentNote = remainingNotes[0];
+    const positions = positionsByNote[currentNote];
+    
+    // Пробуем каждую позицию для текущей ноты
+    for (const position of positions) {
+      // Проверяем, не занята ли уже струна
+      const stringAlreadyUsed = currentCombination.some(pos => pos.string === position.string);
+      
+      if (!stringAlreadyUsed) {
+        generateCombination([...currentCombination, position], remainingNotes.slice(1));
+      }
+    }
+  }
+  
+  generateCombination([], chordNotes);
+  return combinations;
+}
+
+/**
+ * Создает полную аппликатуру для всех 6 струн на основе выбранных позиций
+ * @param {Array} selectedPositions - Выбранные позиции для нот аккорда
+ * @returns {Array} - Полная аппликатура для всех 6 струн
+ */
+function createFullFingering(selectedPositions) {
+  const fingering = [];
+  
+  // Проходим по всем струнам в порядке от 6-й к 1-й
+  for (const string of STRINGS_ORDER) {
+    const position = selectedPositions.find(pos => pos.string === string);
+    
+    if (position) {
+      fingering.push(position);
+    } else {
+      // Если струна не используется в аккорде, помечаем как немую
+      fingering.push({
+        string: string,
+        fret: -1, // -1 означает, что струна не играет (mute)
+        note: null
+      });
+    }
+  }
+  
+  return fingering;
+}
+
+/**
+ * Вычисляет диапазон ладов в аппликатуре
+ * @param {Array} fingering - Аппликатура
+ * @returns {number} - Диапазон ладов (max - min)
+ */
+function calculateFretRange(fingering) {
+  const activeFrets = fingering
+    .filter(pos => pos.fret >= 0)
+    .map(pos => pos.fret);
+  
+  if (activeFrets.length === 0) return 0;
+  
+  const minFret = Math.min(...activeFrets);
+  const maxFret = Math.max(...activeFrets);
+  
+  return maxFret - minFret;
+}
+
+/**
+ * Подсчитывает количество открытых струн в аппликатуре
+ * @param {Array} fingering - Аппликатура
+ * @returns {number} - Количество открытых струн
+ */
+function countOpenStrings(fingering) {
+  return fingering.filter(pos => pos.fret === 0).length;
+}
+
+/**
+ * Проверяет, требует ли аппликатура баррэ
+ * @param {Array} fingering - Аппликатура
+ * @returns {number} - Количество пальцев, необходимых для баррэ (0 если нет баррэ)
+ */
+function calculateBarreRequirement(fingering) {
+  const activePositions = fingering.filter(pos => pos.fret > 0);
+  
+  if (activePositions.length < 2) return 0;
+  
+  // Группируем позиции по ладам
+  const frets = {};
+  activePositions.forEach(pos => {
+    if (!frets[pos.fret]) {
+      frets[pos.fret] = [];
+    }
+    frets[pos.fret].push(pos);
+  });
+  
+  // Проверяем, есть ли лад с более чем одной позицией (требует баррэ)
+  for (const fret in frets) {
+    if (frets[fret].length > 1) {
+      // Проверяем, являются ли позиции на соседних струнах
+      const positions = frets[fret];
+      positions.sort((a, b) => {
+        const stringOrder = ["6E", "5A", "4D", "3G", "2B", "1e"];
+        return stringOrder.indexOf(a.string) - stringOrder.indexOf(b.string);
+      });
+      
+      // Если позиции на соседних струнах, это может быть баррэ
+      let isBarre = true;
+      for (let i = 0; i < positions.length - 1; i++) {
+        const currentIndex = STRINGS_ORDER.indexOf(positions[i].string);
+        const nextIndex = STRINGS_ORDER.indexOf(positions[i + 1].string);
+        
+        if (nextIndex - currentIndex > 1) {
+          isBarre = false;
+          break;
+        }
+      }
+      
+      if (isBarre) {
+        return positions.length; // Возвращаем количество пальцев для баррэ
+      }
+    }
+  }
+  
+  return 0; // Баррэ не требуется
+}
+
+/**
+ * Проверяет соответствие аппликатуры стандартным
+ * @param {Array} fingering - Аппликатура
+ * @param {string} chordName - Название аккорда
+ * @returns {number} - Степень соответствия (0-1)
+ */
+function calculateStandardChordMatch(fingering, chordName) {
+  // Извлекаем базовое название аккорда (без указаний типа)
+  const baseChordName = chordName.replace(/[^A-G]/g, '');
+  
+  if (!STANDARD_CHORDS[baseChordName]) {
+    return 0; // Нет стандартной аппликатуры для сравнения
+  }
+  
+  const standardFingering = STANDARD_CHORDS[baseChordName];
+  let matches = 0;
+  let total = 0;
+  
+  for (let i = 0; i < fingering.length; i++) {
+    const pos = fingering[i];
+    const standardPos = standardFingering[i];
+    
+    if (standardPos.fret === -1) {
+      // Если в стандартной аппликатуре струна не играет, не учитываем ее
+      continue;
+    }
+    
+    total++;
+    
+    if (pos.fret === standardPos.fret && pos.note === standardPos.note) {
+      matches++;
+    }
+  }
+  
+  return total > 0 ? matches / total : 0;
+}
+
+/**
+ * Вычисляет оценку для аппликатуры
+ * @param {Array} fingering - Аппликатура
+ * @param {string} chordName - Название аккорда
+ * @returns {number} - Оценка аппликатуры
+ */
+function calculateScore(fingering, chordName) {
+  const fretRange = calculateFretRange(fingering);
+  const openStrings = countOpenStrings(fingering);
+  const barreRequirement = calculateBarreRequirement(fingering);
+  const standardMatch = calculateStandardChordMatch(fingering, chordName);
+  
+  // Применяем веса
+  let score = 0;
+  score += SCORE_WEIGHTS.fretRange * fretRange;
+  score += SCORE_WEIGHTS.openStrings * openStrings;
+  score += SCORE_WEIGHTS.barreChords * barreRequirement;
+  score += SCORE_WEIGHTS.standardChords * standardMatch;
+  
+  return score;
+}
+
+/**
+ * Определяет ступени нот в аккорде относительно тоники
+ * @param {Array} chordNotes - Ноты аккорда
+ * @param {string} rootNote - Тоника аккорда
+ * @returns {Object} - Объект: нота -> ступень (1, 3, 5, 7 и т.д.)
+ */
+function determineNoteDegrees(chordNotes, rootNote) {
+  const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const rootIndex = chromaticScale.indexOf(rootNote);
+  
+  const noteDegrees = {};
+  
+  chordNotes.forEach(note => {
+    const noteIndex = chromaticScale.indexOf(note);
+    if (noteIndex === -1) return;
+    
+    // Вычисляем интервал в полутонах от тоники
+    let interval = (noteIndex - rootIndex + 12) % 12;
+    
+    // Определяем ступень на основе интервала
+    let degree;
+    switch (interval) {
+      case 0: degree = 1; break;   // Тоника
+      case 3: degree = 3; break;   // Малая терция
+      case 4: degree = 3; break;   // Большая терция
+      case 7: degree = 5; break;   // Квинта
+      case 10: degree = 7; break;  // Малая септима
+      case 11: degree = 7; break;  // Большая септима
+      default: degree = -1; break;  // Неопределенная ступень
+    }
+    
+    noteDegrees[note] = degree;
+  });
+  
+  return noteDegrees;
+}
+
+/**
+ * Находит самую низкую корневую ноту на грифе
+ * @param {string} rootNote - Тоника аккорда
+ * @returns {Object} - Информация о самой низкой коревой ноте {string, fret, note}
+ */
+function findLowestRootNote(rootNote) {
+  let lowestRoot = null;
+  let lowestMidi = Infinity;
+  
+  // Проходим по всем струнам и ладам
+  Object.keys(OPTIMIZER_NOTES_DATA).forEach(string => {
+    OPTIMIZER_NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+      const noteName = extractNoteName(noteWithOctave);
+      
+      // Проверяем, является ли нота корневой
+      if (noteName === rootNote) {
+        const midiNumber = calculateMidiNumber(noteWithOctave);
+        
+        // Ищем самую низкую ноту
+        if (midiNumber < lowestMidi) {
+          lowestMidi = midiNumber;
+          lowestRoot = {
+            note: noteName,
+            string: string,
+            fret: fret
+          };
+        }
+      }
+    });
+  });
+  
+  return lowestRoot;
+}
+
+/**
+ * Вычисляет MIDI номер ноты
+ * @param {string} noteWithOctave - Нота с октавой (например, "C#4")
+ * @returns {number} - MIDI номер ноты
+ */
+function calculateMidiNumber(noteWithOctave) {
+  const noteName = extractNoteName(noteWithOctave);
+  const octave = extractOctave(noteWithOctave);
+  
+  const NOTE_MIDI_NUMBERS = {
+    'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5,
+    'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11
+  };
+  
+  const noteNumber = NOTE_MIDI_NUMBERS[noteName];
+  if (noteNumber === undefined) {
+    throw new Error(`Неизвестная нота: ${noteName}`);
+  }
+  
+  // MIDI формула: (октава + 1) * 12 + номер ноты
+  return (octave + 1) * 12 + noteNumber;
+}
+
+/**
+ * Извлекает октаву из ноты
+ * @param {string} noteWithOctave - Нота с октавой (например, "C#4")
+ * @returns {number} - Октава (например, 4)
+ */
+function extractOctave(noteWithOctave) {
+  const octaveMatch = noteWithOctave.match(/(\d+)/);
+  return octaveMatch ? parseInt(octaveMatch[1]) : 0;
+}
+
+/**
+ * Строит аппликатуру на основе положения корневой ноты и типа аккорда
+ * @param {string} rootNote - Тоника аккорда
+ * @param {Array} chordNotes - Ноты аккорда
+ * @param {Object} rootPosition - Положение корневой ноты
+ * @param {string} chordName - Название аккорда
+ * @returns {Array} - Аппликатура или null
+ */
+function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
+  // Определяем ступени нот в аккорде
+  const noteDegrees = determineNoteDegrees(chordNotes, rootNote);
+  
+  // Определяем тип аппликатуры на основе положения корневой ноты
+  let chordShape;
+  if (rootPosition.string === "6E") {
+    // Аппликатура от 6-й струны
+    chordShape = {
+      strings: ["6E", "5A", "4D", "3G", "2B", "1e"],
+      degrees: [1, 5, 1, 3, 5, 1] // Базовая структура для мажора/минора
+    };
+  } else if (rootPosition.string === "5A") {
+    // Аппликатура от 5-й струны
+    chordShape = {
+      strings: ["5A", "4D", "3G", "2B", "1e"],
+      degrees: [1, 5, 1, 3, 5] // Базовая структура для мажора/минора
+    };
+  } else if (rootPosition.string === "4D") {
+    // Аппликатура от 4-й струны
+    chordShape = {
+      strings: ["4D", "3G", "2B", "1e"],
+      degrees: [1, 5, 1, 3] // Базовая структура для мажора/минора
+    };
+  } else {
+    // Для других струн используем упрощенный подход
+    chordShape = {
+      strings: STRINGS_ORDER,
+      degrees: [1, 3, 5, 1, 3, 5] // Общая структура
+    };
+  }
+  
+  // Определяем, является ли аккорд мажорным или минорным
+  const isMajor = chordName.includes('m') || chordName.includes('min') || chordName.includes('-') ? false : true;
+  
+  // Корректируем структуру в зависимости от типа аккорда
+  if (!isMajor && chordShape.degrees.includes(3)) {
+    // Для минорного аккорда заменяем большую терцию на малую
+    chordShape.degrees = chordShape.degrees.map(d => d === 3 ? 3 : d); // Оставляем как 3, но будем искать малую терцию
+  }
+  
+  // Строим аппликатуру
+  const fingering = [];
+  const rootFret = rootPosition.fret;
+  
+  // Проходим по струнам в аппликатуре
+  for (let i = 0; i < chordShape.strings.length; i++) {
+    const string = chordShape.strings[i];
+    const degree = chordShape.degrees[i];
+    
+    // Определяем, какую ноту нужно найти на этой струне
+    let targetNote = null;
+    
+    if (degree === 1) {
+      targetNote = rootNote;
+    } else {
+      // Ищем ноту соответствующей ступени в аккорде
+      for (const note of chordNotes) {
+        if (noteDegrees[note] === degree) {
+          targetNote = note;
+          break;
+        }
+      }
+    }
+    
+    if (!targetNote) {
+      // Если нота не найдена, пропускаем струну
+      fingering.push({
+        string: string,
+        fret: -1,
+        note: null
+      });
+      continue;
+    }
+    
+    // Ищем позицию для этой ноты на струне
+    let foundPosition = null;
+    
+    // Сначала ищем на том же ладу, что и корневая нота
+    for (let fret = Math.max(0, rootFret - 2); fret <= Math.min(4, rootFret + 2); fret++) {
+      const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+      if (!noteWithOctave) continue;
+      
+      const noteName = extractNoteName(noteWithOctave);
+      if (noteName === targetNote) {
+        foundPosition = {
+          string: string,
+          fret: fret,
+          note: noteName
+        };
+        break;
+      }
+    }
+    
+    // Если не нашли рядом с корневой нотой, ищем по всем ладам
+    if (!foundPosition) {
+      for (let fret = 0; fret <= 4; fret++) {
+        const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+        if (!noteWithOctave) continue;
+        
+        const noteName = extractNoteName(noteWithOctave);
+        if (noteName === targetNote) {
+          foundPosition = {
+            string: string,
+            fret: fret,
+            note: noteName
+          };
+          break;
+        }
+      }
+    }
+    
+    if (foundPosition) {
+      fingering.push(foundPosition);
+    } else {
+      // Если нота не найдена, помечаем струну как немую
+      fingering.push({
+        string: string,
+        fret: -1,
+        note: null
+      });
+    }
+  }
+  
+  // Если аппликатура построена не на всех 6 струнах, дополняем
+  if (fingering.length < 6) {
+    const fullFingering = [];
+    
+    // Проходим по всем струнам в порядке от 6-й к 1-й
+    for (const string of STRINGS_ORDER) {
+      const position = fingering.find(pos => pos.string === string);
+      
+      if (position) {
+        fullFingering.push(position);
+      } else {
+        // Если струна не используется в аккорде, помечаем как немую
+        fullFingering.push({
+          string: string,
+          fret: -1,
+          note: null
+        });
+      }
+    }
+    
+    return fullFingering;
+  }
+  
+  return fingering;
+}
+
+/**
+ * Находит оптимальную аппликатуру для аккорда
+ * @param {Array} chordNotes - Ноты аккорда
+ * @param {string} chordName - Название аккорда
+ * @param {Object} options - Опции поиска
+ * @returns {Object} - Результат поиска оптимальной аппликатуры
+ */
+function findOptimalFingering(chordNotes, chordName = '', options = {}) {
+  const {
+    maxFretRange = 4,    // Максимальный диапазон ладов
+    topN = 5,            // Количество возвращаемых аппликатур
+    scoreThreshold = -5  // Пороговое значение оценки
+  } = options;
+  
+  // 1. Определяем корневую ноту аккорда (тоника)
+  const rootNote = chordNotes[0];
+  
+  // 2. Находим самую низкую корневую ноту на грифе
+  const lowestRoot = findLowestRootNote(rootNote);
+  
+  if (!lowestRoot) {
+    console.warn(`Не найдена корневая нота "${rootNote}" на грифе в пределах ладов 0-4`);
+    return {
+      chordName: chordName,
+      notes: chordNotes,
+      totalCombinations: 0,
+      validCombinations: 0,
+      hasGoodFingering: false,
+      topFingerings: [],
+      bestFingering: null
+    };
+  }
+  
+  // 3. Строим аппликатуру на основе положения корневой ноты
+  const primaryFingering = buildChordFromRoot(rootNote, chordNotes, lowestRoot, chordName);
+  
+  // Если основная аппликатура не построена, пробуем альтернативные подходы
+  if (!primaryFingering) {
+    // Находим все возможные позиции для каждой ноты
+    const positionsByNote = findAllPossiblePositions(chordNotes);
+    
+    // Генерируем все возможные комбинации
+    const allCombinations = generateAllCombinations(positionsByNote, chordNotes);
+    
+    // Фильтруем комбинации по диапазону ладов
+    const validCombinations = allCombinations.filter(fingering => {
+      const fretRange = calculateFretRange(fingering);
+      return fretRange <= maxFretRange;
+    });
+    
+    // Если нет комбинаций, удовлетворяющих ограничениям, возвращаем лучшие из всех
+    const combinationsToEvaluate = validCombinations.length > 0 ?
+      validCombinations : allCombinations;
+    
+    // Вычисляем оценку для каждой комбинации
+    const scoredCombinations = combinationsToEvaluate.map(fingering => ({
+      fingering: fingering,
+      score: calculateScore(fingering, chordName),
+      fretRange: calculateFretRange(fingering),
+      openStrings: countOpenStrings(fingering),
+      barreRequirement: calculateBarreRequirement(fingering),
+      standardMatch: calculateStandardChordMatch(fingering, chordName)
+    }));
+    
+    // Сортируем по убыванию оценки
+    scoredCombinations.sort((a, b) => b.score - a.score);
+    
+    // Отбираем топ-N аппликатур
+    const topCombinations = scoredCombinations.slice(0, topN);
+    
+    // Проверяем, есть ли аппликатуры с оценкой выше порога
+    const hasGoodFingering = topCombinations.length > 0 &&
+      topCombinations[0].score >= scoreThreshold;
+    
+    return {
+      chordName: chordName,
+      notes: chordNotes,
+      totalCombinations: allCombinations.length,
+      validCombinations: validCombinations.length,
+      hasGoodFingering: hasGoodFingering,
+      topFingerings: topCombinations,
+      bestFingering: topCombinations.length > 0 ? topCombinations[0] : null
+    };
+  }
+  
+  // Вычисляем оценку для основной аппликатуры
+  const primaryScore = {
+    fingering: primaryFingering,
+    score: calculateScore(primaryFingering, chordName),
+    fretRange: calculateFretRange(primaryFingering),
+    openStrings: countOpenStrings(primaryFingering),
+    barreRequirement: calculateBarreRequirement(primaryFingering),
+    standardMatch: calculateStandardChordMatch(primaryFingering, chordName)
+  };
+  
+  // Проверяем, есть ли аппликатуры с оценкой выше порога
+  const hasGoodFingering = primaryScore.score >= scoreThreshold;
+  
+  return {
+    chordName: chordName,
+    notes: chordNotes,
+    totalCombinations: 1,
+    validCombinations: hasGoodFingering ? 1 : 0,
+    hasGoodFingering: hasGoodFingering,
+    topFingerings: [primaryScore],
+    bestFingering: primaryScore
+  };
+}
+
+/**
+ * Выводит информацию о найденной аппликатуре в консоль
+ * @param {Object} result - Результат функции findOptimalFingering
+ */
+function logOptimalFingering(result) {
+  console.log(`\nОптимальная аппликатура для аккорда "${result.chordName}":`);
+  console.log(`Ноты аккорда: [${result.notes.join(', ')}]`);
+  console.log(`Всего комбинаций: ${result.totalCombinations}`);
+  console.log(`Валидных комбинаций: ${result.validCombinations}`);
+  console.log(`Найдена хорошая аппликатура: ${result.hasGoodFingering ? 'Да' : 'Нет'}`);
+  
+  if (result.bestFingering) {
+    console.log(`\nЛучшая аппликатура (оценка: ${result.bestFingering.score.toFixed(2)}):`);
+    console.log(`Диапазон ладов: ${result.bestFingering.fretRange}`);
+    console.log(`Открытых струн: ${result.bestFingering.openStrings}`);
+    console.log(`Требует баррэ: ${result.bestFingering.barreRequirement > 0 ? 'Да' : 'Нет'}`);
+    console.log(`Соответствие стандарту: ${(result.bestFingering.standardMatch * 100).toFixed(0)}%`);
+    
+    console.log('\nАппликатура:');
+    result.bestFingering.fingering.forEach((pos, index) => {
+      if (pos.fret === -1) {
+        console.log(`  ${index + 1}. Струна ${pos.string}: немая`);
+      } else {
+        console.log(`  ${index + 1}. Струна ${pos.string}, лад ${pos.fret}, нота ${pos.note || 'N/A'}`);
+      }
+    });
+  } else {
+    console.log('Подходящая аппликатура не найдена');
+  }
+}
+
+// Экспортируем функции для использования в других модулях
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    findOptimalFingering,
+    findAllPossiblePositions,
+    generateAllCombinations,
+    calculateScore,
+    logOptimalFingering,
+    extractNoteName,
+    calculateFretRange,
+    countOpenStrings,
+    calculateBarreRequirement,
+    calculateStandardChordMatch
+  };
+} else {
+  // Для использования в браузере
+  window.ChordOptimizer = {
+    findOptimalFingering,
+    findAllPossiblePositions,
+    generateAllCombinations,
+    calculateScore,
+    logOptimalFingering,
+    extractNoteName,
+    calculateFretRange,
+    countOpenStrings,
+    calculateBarreRequirement,
+    calculateStandardChordMatch
+  };
+}

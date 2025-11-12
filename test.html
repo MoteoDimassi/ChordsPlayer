@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тест парсера аккордов</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            background-color: #f5f5f5;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: #e9f7ef;
+            border-left: 5px solid #4CAF50;
+        }
+        .error {
+            background-color: #ffebee;
+            border-left: 5px solid #f44336;
+        }
+        .examples {
+            margin-top: 20px;
+        }
+        .example-chord {
+            display: inline-block;
+            background-color: #e3f2fd;
+            padding: 5px 10px;
+            margin: 3px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .example-chord:hover {
+            background-color: #bbdefb;
+        }
+        .supported-types {
+            margin-top: 20px;
+        }
+        .chord-type {
+            display: inline-block;
+            background-color: #f3e5f5;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Тест парсера аккордов</h1>
+    
+    <div class="container">
+        <h2>Проверка парсера аккордов</h2>
+        <div class="input-group">
+            <label for="chordInput">Введите аккорд:</label>
+            <input type="text" id="chordInput" placeholder="Например: C#m7, Cmaj7, Dsus4">
+        </div>
+        <button id="parseButton">Распарсить аккорд</button>
+        <button id="matchButton">Найти позиции на грифе</button>
+        <button id="optimizeButton">Найти оптимальную аппликатуру</button>
+        <button id="mapAudioButton">Сопоставить с аудиофайлами</button>
+        <button id="testPitchShiftButton">Тестировать транспонирование</button>
+        <button id="preloadButton">Предзагрузить все сэмплы</button>
+        <button id="cacheInfoButton">Информация о кэше</button>
+        <button id="clearCacheButton">Очистить кэш</button>
+        <div id="result" class="result" style="display: none;"></div>
+        <div id="positionsResult" class="result" style="display: none;"></div>
+        <div id="optimizeResult" class="result" style="display: none;"></div>
+        <div id="mapAudioResult" class="result" style="display: none;"></div>
+        <div id="testPitchShiftResult" class="result" style="display: none;"></div>
+        <div id="preloadResult" class="result" style="display: none;"></div>
+        <div id="cacheInfoResult" class="result" style="display: none;"></div>
+    </div>
+    
+    <div class="container examples">
+        <h3>Примеры аккордов для тестирования:</h3>
+        <div>
+            <span class="example-chord" data-chord="C">C</span>
+            <span class="example-chord" data-chord="Cm">Cm</span>
+            <span class="example-chord" data-chord="C7">C7</span>
+            <span class="example-chord" data-chord="Cmaj7">Cmaj7</span>
+            <span class="example-chord" data-chord="Cm7">Cm7</span>
+            <span class="example-chord" data-chord="C#m7">C#m7</span>
+            <span class="example-chord" data-chord="Csus4">Csus4</span>
+            <span class="example-chord" data-chord="Cadd9">Cadd9</span>
+            <span class="example-chord" data-chord="C6">C6</span>
+            <span class="example-chord" data-chord="Cdim">Cdim</span>
+            <span class="example-chord" data-chord="Caug">Caug</span>
+        </div>
+    </div>
+    
+    <div class="container supported-types">
+        <h3>Поддерживаемые типы аккордов:</h3>
+        <div id="supportedTypes"></div>
+    </div>
+    
+    <script src="chordParser.js"></script>
+    <script src="chordMatcher.js"></script>
+    <script src="chordOptimizer.js"></script>
+    <script src="audioMapper.js"></script>
+    <script src="audioBufferCache.js"></script>
+    <script src="pitchShift.js"></script>
+    <script>
+        // Проверяем, что все модули загружены
+        window.addEventListener('load', function() {
+            if (typeof window.AudioMapper === 'undefined') {
+                console.error('❌ Модуль AudioMapper не загружен');
+            } else {
+                console.log('✅ Модуль AudioMapper загружен');
+            }
+            
+            if (typeof window.ChordParser === 'undefined') {
+                console.error('❌ Модуль ChordParser не загружен');
+            } else {
+                console.log('✅ Модуль ChordParser загружен');
+            }
+            
+            if (typeof window.ChordMatcher === 'undefined') {
+                console.error('❌ Модуль ChordMatcher не загружен');
+            } else {
+                console.log('✅ Модуль ChordMatcher загружен');
+            }
+            
+            if (typeof window.ChordOptimizer === 'undefined') {
+                console.error('❌ Модуль ChordOptimizer не загружен');
+            } else {
+                console.log('✅ Модуль ChordOptimizer загружен');
+            }
+            
+            if (typeof window.AudioBufferCache === 'undefined') {
+                console.error('❌ Модуль AudioBufferCache не загружен');
+            } else {
+                console.log('✅ Модуль AudioBufferCache загружен');
+            }
+            
+            if (typeof window.PitchShift === 'undefined') {
+                console.error('❌ Модуль PitchShift не загружен');
+            } else {
+                console.log('✅ Модуль PitchShift загружен');
+            }
+        });
+        // Функция для установки аккорда в поле ввода
+        function setChord(chord) {
+            document.getElementById('chordInput').value = chord;
+            parseChordInput();
+            findPositions();
+            findOptimalFingering();
+            mapToAudioFiles();
+        }
+        
+        // Функция для парсинга аккорда из поля ввода
+        function parseChordInput() {
+            const chordInput = document.getElementById('chordInput').value;
+            const resultDiv = document.getElementById('result');
+            
+            if (!chordInput.trim()) {
+                resultDiv.style.display = 'none';
+                // Скрываем все результаты при пустом вводе
+                document.getElementById('positionsResult').style.display = 'none';
+                document.getElementById('optimizeResult').style.display = 'none';
+                document.getElementById('mapAudioResult').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const notes = ChordParser.parseChord(chordInput);
+                resultDiv.className = 'result';
+                resultDiv.innerHTML = `
+                    <strong>Аккорд:</strong> ${chordInput}<br>
+                    <strong>Ноты:</strong> [${notes.map(note => `"${note}"`).join(', ')}]<br>
+                    <strong>Количество нот:</strong> ${notes.length}
+                `;
+                resultDiv.style.display = 'block';
+                
+                // Сохраняем ноты для возможного использования в матчинге
+                window.currentChordNotes = notes;
+                
+                // Сбрасываем кэш результатов при изменении аккорда
+                window.currentOptimizeResult = null;
+                window.currentMapResult = null;
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <strong>Ошибка:</strong> ${error.message}
+                `;
+                resultDiv.style.display = 'block';
+            }
+        }
+        
+        // Функция для поиска позиций на грифе
+        function findPositions() {
+            const chordInput = document.getElementById('chordInput').value;
+            const positionsDiv = document.getElementById('positionsResult');
+            
+            if (!chordInput.trim()) {
+                positionsDiv.style.display = 'none';
+                return;
+            }
+            
+            // Скрываем результаты следующих шагов при поиске позиций
+            document.getElementById('optimizeResult').style.display = 'none';
+            document.getElementById('mapAudioResult').style.display = 'none';
+            
+            try {
+                // Если ноты еще не получены, парсим аккорд
+                let notes = window.currentChordNotes;
+                if (!notes) {
+                    notes = ChordParser.parseChord(chordInput);
+                    window.currentChordNotes = notes;
+                }
+                
+                // Находим аппликатуру для аккорда
+                const chordResult = ChordMatcher.findChordPositions(notes, chordInput);
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Анализ аккорда ${chordInput}:</strong><br><br>`;
+                html += `<strong>Ноты аккорда:</strong> [${chordResult.notes.map(note => `"${note}"`).join(', ')}]<br><br>`;
+                
+                if (chordResult.shape) {
+                    html += `<strong>Тип аппликатуры:</strong> ${chordResult.shape}<br>`;
+                    html += `<strong>Положение тоники:</strong> струна ${chordResult.rootPosition.string}, лад ${chordResult.rootPosition.fret}<br><br>`;
+                    
+                    html += '<strong>Аппликатура:</strong><br>';
+                    html += '<table style="margin-left: 20px; border-collapse: collapse;">';
+                    html += '<tr><th style="border: 1px solid #ddd; padding: 5px;">№</th><th style="border: 1px solid #ddd; padding: 5px;">Струна</th><th style="border: 1px solid #ddd; padding: 5px;">Лад</th><th style="border: 1px solid #ddd; padding: 5px;">Нота</th><th style="border: 1px solid #ddd; padding: 5px;">Октава</th><th style="border: 1px solid #ddd; padding: 5px;">MIDI</th></tr>';
+                    
+                    chordResult.fingering.forEach((pos, index) => {
+                        html += `<tr>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${index + 1}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.string}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.fret}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.note}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.octave}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.midi}</td>`;
+                        html += `</tr>`;
+                    });
+                    
+                    html += '</table>';
+                } else {
+                    html += `<span style="color: red;">Аппликатура не найдена для аккорда ${chordInput}</span><br>`;
+                    html += `<em>Возможные причины:</em><br>`;
+                    html += `<em>- Ноты аккорда выходят за пределы первых 5 ладов</em><br>`;
+                    html += `<em>- Аккорд требует сложной аппликатуры с баррэ</em><br>`;
+                    html += `<em>- Неподдерживаемый тип аккорда</em>`;
+                }
+                
+                positionsDiv.className = 'result';
+                positionsDiv.innerHTML = html;
+                positionsDiv.style.display = 'block';
+                
+                // Также выводим в консоль для детального анализа
+                console.log(`Результат анализа аккорда ${chordInput}:`, chordResult);
+                ChordMatcher.logPositions(chordResult);
+                
+            } catch (error) {
+                positionsDiv.className = 'result error';
+                positionsDiv.innerHTML = `
+                    <strong>Ошибка при поиске аппликатуры:</strong> ${error.message}
+                `;
+                positionsDiv.style.display = 'block';
+            }
+        }
+        
+        // Функция для поиска оптимальной аппликатуры
+        function findOptimalFingering() {
+            const chordInput = document.getElementById('chordInput').value;
+            const optimizeDiv = document.getElementById('optimizeResult');
+            
+            if (!chordInput.trim()) {
+                optimizeDiv.style.display = 'none';
+                return;
+            }
+            
+            // Скрываем результат следующего шага при поиске оптимальной аппликатуры
+            document.getElementById('mapAudioResult').style.display = 'none';
+            
+            try {
+                // Если ноты еще не получены, парсим аккорд
+                let notes = window.currentChordNotes;
+                if (!notes) {
+                    notes = ChordParser.parseChord(chordInput);
+                    window.currentChordNotes = notes;
+                }
+                
+                // Находим оптимальную аппликатуру для аккорда
+                const optimizeResult = ChordOptimizer.findOptimalFingering(notes, chordInput);
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Оптимальная аппликатура для аккорда ${chordInput}:</strong><br><br>`;
+                html += `<strong>Ноты аккорда:</strong> [${optimizeResult.notes.map(note => `"${note}"`).join(', ')}]<br>`;
+                html += `<strong>Всего комбинаций:</strong> ${optimizeResult.totalCombinations}<br>`;
+                html += `<strong>Валидных комбинаций:</strong> ${optimizeResult.validCombinations}<br>`;
+                html += `<strong>Найдена хорошая аппликатура:</strong> ${optimizeResult.hasGoodFingering ? 'Да' : 'Нет'}<br><br>`;
+                
+                if (optimizeResult.bestFingering) {
+                    html += `<strong>Лучшая аппликатура (оценка: ${optimizeResult.bestFingering.score.toFixed(2)}):</strong><br>`;
+                    html += `<strong>Диапазон ладов:</strong> ${optimizeResult.bestFingering.fretRange}<br>`;
+                    html += `<strong>Открытых струн:</strong> ${optimizeResult.bestFingering.openStrings}<br>`;
+                    html += `<strong>Требует баррэ:</strong> ${optimizeResult.bestFingering.barreRequirement > 0 ? 'Да' : 'Нет'}<br>`;
+                    html += `<strong>Соответствие стандарту:</strong> ${(optimizeResult.bestFingering.standardMatch * 100).toFixed(0)}%<br><br>`;
+                    
+                    html += '<strong>Аппликатура:</strong><br>';
+                    html += '<table style="margin-left: 20px; border-collapse: collapse;">';
+                    html += '<tr><th style="border: 1px solid #ddd; padding: 5px;">№</th><th style="border: 1px solid #ddd; padding: 5px;">Струна</th><th style="border: 1px solid #ddd; padding: 5px;">Лад</th><th style="border: 1px solid #ddd; padding: 5px;">Нота</th></tr>';
+                    
+                    optimizeResult.bestFingering.fingering.forEach((pos, index) => {
+                        html += `<tr>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${index + 1}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.string}</td>`;
+                        if (pos.fret === -1) {
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">немая</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">-</td>`;
+                        } else {
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.fret}</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${pos.note || 'N/A'}</td>`;
+                        }
+                        html += `</tr>`;
+                    });
+                    
+                    html += '</table>';
+                    
+                    // Добавляем топ-5 аппликатур
+                    if (optimizeResult.topFingerings.length > 1) {
+                        html += '<br><strong>Топ-5 аппликатур:</strong><br>';
+                        html += '<table style="margin-left: 20px; border-collapse: collapse;">';
+                        html += '<tr><th style="border: 1px solid #ddd; padding: 5px;">№</th><th style="border: 1px solid #ddd; padding: 5px;">Оценка</th><th style="border: 1px solid #ddd; padding: 5px;">Диапазон</th><th style="border: 1px solid #ddd; padding: 5px;">Открытые</th><th style="border: 1px solid #ddd; padding: 5px;">Баррэ</th></tr>';
+                        
+                        optimizeResult.topFingerings.forEach((fingering, index) => {
+                            html += `<tr>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${index + 1}</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${fingering.score.toFixed(2)}</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${fingering.fretRange}</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${fingering.openStrings}</td>`;
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${fingering.barreRequirement > 0 ? 'Да' : 'Нет'}</td>`;
+                            html += `</tr>`;
+                        });
+                        
+                        html += '</table>';
+                    }
+                } else {
+                    html += `<span style="color: red;">Подходящая аппликатура не найдена для аккорда ${chordInput}</span><br>`;
+                    html += `<em>Возможные причины:</em><br>`;
+                    html += `<em>- Ноты аккорда выходят за пределы первых 5 ладов</em><br>`;
+                    html += `<em>- Слишком сложная структура аккорда</em><br>`;
+                    html += `<em>- Недостаточно струн для воспроизведения всех нот</em>`;
+                }
+                
+                optimizeDiv.className = 'result';
+                optimizeDiv.innerHTML = html;
+                optimizeDiv.style.display = 'block';
+                
+                // Также выводим в консоль для детального анализа
+                console.log(`Результат оптимизации аккорда ${chordInput}:`, optimizeResult);
+                ChordOptimizer.logOptimalFingering(optimizeResult);
+                
+            } catch (error) {
+                optimizeDiv.className = 'result error';
+                optimizeDiv.innerHTML = `
+                    <strong>Ошибка при поиске оптимальной аппликатуры:</strong> ${error.message}
+                `;
+                optimizeDiv.style.display = 'block';
+            }
+        }
+        
+        // Функция для сопоставления аппликатуры с аудиофайлами
+        async function mapToAudioFiles() {
+            const chordInput = document.getElementById('chordInput').value;
+            const mapAudioDiv = document.getElementById('mapAudioResult');
+            
+            if (!chordInput.trim()) {
+                mapAudioDiv.style.display = 'none';
+                return;
+            }
+            
+            try {
+                // Если ноты еще не получены, парсим аккорд
+                let notes = window.currentChordNotes;
+                if (!notes) {
+                    notes = ChordParser.parseChord(chordInput);
+                    window.currentChordNotes = notes;
+                }
+                
+                // Находим оптимальную аппликатуру для аккорда
+                const optimizeResult = ChordOptimizer.findOptimalFingering(notes, chordInput);
+                window.currentOptimizeResult = optimizeResult;
+                
+                if (!optimizeResult.bestFingering) {
+                    throw new Error('Не найдена оптимальная аппликатура для сопоставления');
+                }
+                
+                const fingering = optimizeResult.bestFingering.fingering;
+                
+                // Создаем AudioContext (если еще не создан)
+                if (!window.audioContext) {
+                    window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                // Получаем пути к аудиофайлам для аппликатуры
+                const audioFilePaths = await AudioMapper.getAudioFilePaths(fingering);
+                
+                // Загружаем и кэшируем все необходимые аудиобуферы
+                const bufferResult = await AudioBufferCache.loadAndCacheAudioBuffers(window.audioContext, audioFilePaths);
+                
+                // Создаем результат сопоставления с загруженными буферами
+                const mapResult = {
+                    fingering: fingering,
+                    audioFiles: audioFilePaths,
+                    audioBuffers: audioFilePaths.map(filePath => AudioBufferCache.getCachedAudioBuffer(filePath) || null),
+                    pitchShifted: [], // Будет заполнено ниже
+                    errors: bufferResult.errors.map(error => ({
+                        string: "Неизвестно",
+                        fret: "Неизвестно",
+                        error: error.error
+                    })),
+                    success: bufferResult.success
+                };
+                
+                // Заполняем информацию о транспонировании (пока все без транспонирования)
+                fingering.forEach(position => {
+                    mapResult.pitchShifted.push({
+                        string: position.string,
+                        wasPitchShifted: false,
+                        semitones: 0
+                    });
+                });
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Сопоставление аппликатуры с аудиофайлами для аккорда ${chordInput}:</strong><br><br>`;
+                html += `<strong>Успешность:</strong> ${mapResult.success ? '✅ Да' : '❌ Нет'}<br>`;
+                
+                if (mapResult.errors.length > 0) {
+                    html += '<br><strong>Ошибки:</strong><br>';
+                    mapResult.errors.forEach(error => {
+                        if (error.general) {
+                            html += `- Общая ошибка: ${error.general}<br>`;
+                        } else {
+                            html += `- Струна ${error.string}, лад ${error.fret}: ${error.error}<br>`;
+                        }
+                    });
+                }
+                
+                html += '<br><strong>Сопоставление струн:</strong><br>';
+                html += '<table style="margin-left: 20px; border-collapse: collapse;">';
+                html += '<tr><th style="border: 1px solid #ddd; padding: 5px;">№</th><th style="border: 1px solid #ddd; padding: 5px;">Струна</th><th style="border: 1px solid #ddd; padding: 5px;">Лад</th><th style="border: 1px solid #ddd; padding: 5px;">Аудиофайл</th><th style="border: 1px solid #ddd; padding: 5px;">Транспонирование</th></tr>';
+                
+                mapResult.fingering.forEach((position, index) => {
+                    const audioFile = mapResult.audioFiles[index];
+                    const pitchShiftInfo = mapResult.pitchShifted[index];
+                    
+                    html += `<tr>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${index + 1}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${position.string}</td>`;
+                    
+                    if (position.fret === -1) {
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">немая</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">беззвучный буфер</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">-</td>`;
+                    } else {
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${position.fret}</td>`;
+                        html += `<td style="border: 1px solid #ddd; padding: 5px;">${audioFile}</td>`;
+                        
+                        if (pitchShiftInfo.wasPitchShifted) {
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">${pitchShiftInfo.semitones > 0 ? '+' : ''}${pitchShiftInfo.semitones} полутонов</td>`;
+                        } else {
+                            html += `<td style="border: 1px solid #ddd; padding: 5px;">-</td>`;
+                        }
+                    }
+                    
+                    html += `</tr>`;
+                });
+                
+                html += '</table>';
+                
+                // Добавляем кнопку для воспроизведения аккорда
+                if (mapResult.success) {
+                    html += '<br><button id="playChordButton">Воспроизвести аккорд</button>';
+                    html += '<div id="playStatus" style="margin-top: 10px;"></div>';
+                }
+                
+                mapAudioDiv.className = 'result';
+                mapAudioDiv.innerHTML = html;
+                mapAudioDiv.style.display = 'block';
+                
+                // Сохраняем результат для возможного воспроизведения
+                window.currentMapResult = mapResult;
+                
+                // Также выводим в консоль для детального анализа
+                console.log(`Результат сопоставления аккорда ${chordInput}:`, mapResult);
+                AudioMapper.logMappingResult(mapResult);
+                
+            } catch (error) {
+                mapAudioDiv.className = 'result error';
+                mapAudioDiv.innerHTML = `
+                    <strong>Ошибка при сопоставлении с аудиофайлами:</strong> ${error.message}
+                `;
+                mapAudioDiv.style.display = 'block';
+            }
+        }
+        
+        // Функция для воспроизведения аккорда
+        function playChord() {
+            if (!window.currentMapResult || !window.audioContext) {
+                alert('Нет данных для воспроизведения');
+                return;
+            }
+            
+            const mapResult = window.currentMapResult;
+            const playStatusDiv = document.getElementById('playStatus');
+            
+            try {
+                // Восстанавливаем AudioContext, если он был приостановлен
+                if (window.audioContext.state === 'suspended') {
+                    window.audioContext.resume();
+                }
+                
+                const currentTime = window.audioContext.currentTime;
+                const startTime = currentTime + 0.05; // Небольшая задержка для подготовки
+                
+                // Создаем источники для каждой струны
+                mapResult.audioBuffers.forEach((buffer, index) => {
+                    const source = window.audioContext.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(window.audioContext.destination);
+                    source.start(startTime);
+                });
+                
+                playStatusDiv.innerHTML = '✅ Аккорд воспроизводится...';
+                setTimeout(() => {
+                    playStatusDiv.innerHTML = '';
+                }, 3000);
+                
+            } catch (error) {
+                playStatusDiv.innerHTML = `❌ Ошибка воспроизведения: ${error.message}`;
+            }
+        }
+        
+        // Функция для тестирования транспонирования
+        async function testPitchShift() {
+            const testPitchShiftDiv = document.getElementById('testPitchShiftResult');
+            
+            try {
+                // Создаем AudioContext (если еще не создан)
+                if (!window.audioContext) {
+                    window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                testPitchShiftDiv.className = 'result';
+                testPitchShiftDiv.innerHTML = 'Начинаю тестирование транспонирования...';
+                testPitchShiftDiv.style.display = 'block';
+                
+                // Проверяем, доступен ли модуль PitchShift
+                if (typeof window.PitchShift === 'undefined') {
+                    throw new Error('Модуль PitchShift не загружен');
+                }
+                
+                // Загружаем тестовый аудиофайл
+                const testFilePath = 'samples/1e/fret0.mp3';
+                const testBuffer = await AudioBufferCache.loadAndCacheAudioBuffer(window.audioContext, testFilePath);
+                
+                if (!testBuffer) {
+                    throw new Error(`Не удалось загрузить тестовый файл: ${testFilePath}`);
+                }
+                
+                // Тестируем различные значения транспонирования
+                const testSemitones = [-2, -1, 0, 1, 2, 3];
+                const results = [];
+                
+                for (const semitones of testSemitones) {
+                    const startTime = performance.now();
+                    
+                    // Применяем транспонирование
+                    const pitchShiftResult = await window.PitchShift.pitchShiftWebAudio(
+                        window.audioContext,
+                        testBuffer,
+                        semitones,
+                        {
+                            enableQualityCheck: true,
+                            logTransformations: false
+                        }
+                    );
+                    
+                    const endTime = performance.now();
+                    const processingTime = ((endTime - startTime) / 1000).toFixed(3);
+                    
+                    results.push({
+                        semitones: semitones,
+                        quality: pitchShiftResult.quality,
+                        transformation: pitchShiftResult.transformation,
+                        processingTime: processingTime
+                    });
+                }
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Результаты тестирования транспонирования:</strong><br><br>`;
+                html += `<strong>Тестовый файл:</strong> ${testFilePath}<br>`;
+                html += `<strong>Длительность:</strong> ${testBuffer.duration.toFixed(2)} сек<br>`;
+                html += `<strong>Частота дискретизации:</strong> ${testBuffer.sampleRate} Гц<br><br>`;
+                
+                html += '<strong>Результаты транспонирования:</strong><br>';
+                html += '<table style="margin-left: 20px; border-collapse: collapse;">';
+                html += '<tr><th style="border: 1px solid #ddd; padding: 5px;">Полутоны</th><th style="border: 1px solid #ddd; padding: 5px;">Качество</th><th style="border: 1px solid #ddd; padding: 5px;">Алгоритм</th><th style="border: 1px solid #ddd; padding: 5px;">Центы</th><th style="border: 1px solid #ddd; padding: 5px;">Время обработки</th></tr>';
+                
+                results.forEach(result => {
+                    const qualityClass = result.quality.isHighQuality ? 'style="color: green;"' : 'style="color: orange;"';
+                    const qualityText = result.quality.isHighQuality ? 'Высокое' : 'Низкое';
+                    
+                    html += `<tr>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${result.semitones > 0 ? '+' : ''}${result.semitones}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;" ${qualityClass}>${qualityText}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${result.transformation.algorithm}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${Math.abs(result.quality.cents)}</td>`;
+                    html += `<td style="border: 1px solid #ddd; padding: 5px;">${result.processingTime} сек</td>`;
+                    html += `</tr>`;
+                });
+                
+                html += '</table>';
+                
+                // Добавляем информацию о порогах качества
+                html += '<br><strong>Информация о качестве:</strong><br>';
+                html += `- Порог высокого качества: ±${window.PitchShift.MAX_HIGH_QUALITY_SEMITONES} полутона<br>`;
+                html += `- Порог низкого качества: > ±${window.PitchShift.MAX_HIGH_QUALITY_SEMITONES} полутона<br>`;
+                html += `- Точность: в пределах ±${window.PitchShift.LOW_QUALITY_THRESHOLD_CENTS} центов от целевой ноты`;
+                
+                // Добавляем кнопки для воспроизведения
+                html += '<br><strong>Воспроизведение:</strong><br>';
+                html += '<button id="playOriginalButton">Воспроизвести оригинал</button> ';
+                html += '<button id="playShiftedUpButton">Воспроизвести (+1 полутон)</button> ';
+                html += '<button id="playShiftedDownButton">Воспроизвести (-1 полутон)</button>';
+                html += '<div id="playTestStatus" style="margin-top: 10px;"></div>';
+                
+                testPitchShiftDiv.innerHTML = html;
+                
+                // Сохраняем результаты для воспроизведения
+                window.testPitchShiftResults = {
+                    original: testBuffer,
+                    shiftedUp: results.find(r => r.semitones === 1),
+                    shiftedDown: results.find(r => r.semitones === -1)
+                };
+                
+                // Также выводим в консоль для детального анализа
+                console.log('Результаты тестирования транспонирования:', results);
+                
+            } catch (error) {
+                testPitchShiftDiv.className = 'result error';
+                testPitchShiftDiv.innerHTML = `
+                    <strong>Ошибка при тестировании транспонирования:</strong> ${error.message}
+                `;
+                console.error('Ошибка при тестировании транспонирования:', error);
+            }
+        }
+        
+        // Функция для воспроизведения тестовых аудиобуферов
+        function playTestAudio(bufferType) {
+            if (!window.testPitchShiftResults || !window.audioContext) {
+                alert('Нет данных для воспроизведения');
+                return;
+            }
+            
+            const playStatusDiv = document.getElementById('playTestStatus');
+            
+            try {
+                // Восстанавливаем AudioContext, если он был приостановлен
+                if (window.audioContext.state === 'suspended') {
+                    window.audioContext.resume();
+                }
+                
+                let buffer;
+                let description;
+                
+                switch (bufferType) {
+                    case 'original':
+                        buffer = window.testPitchShiftResults.original;
+                        description = 'оригинал';
+                        break;
+                    case 'shiftedUp':
+                        buffer = window.testPitchShiftResults.shiftedUp.buffer || window.testPitchShiftResults.original;
+                        description = '+1 полутон';
+                        break;
+                    case 'shiftedDown':
+                        buffer = window.testPitchShiftResults.shiftedDown.buffer || window.testPitchShiftResults.original;
+                        description = '-1 полутон';
+                        break;
+                    default:
+                        throw new Error('Неизвестный тип буфера');
+                }
+                
+                // Создаем источник
+                const source = window.audioContext.createBufferSource();
+                source.buffer = buffer;
+                source.connect(window.audioContext.destination);
+                source.start();
+                
+                playStatusDiv.innerHTML = `✅ Воспроизведение: ${description}`;
+                setTimeout(() => {
+                    playStatusDiv.innerHTML = '';
+                },3000);
+                
+            } catch (error) {
+                playStatusDiv.innerHTML = `❌ Ошибка воспроизведения: ${error.message}`;
+            }
+        }
+        
+        // Функция для предзагрузки всех сэмплов
+        async function preloadAllSamples() {
+            const preloadDiv = document.getElementById('preloadResult');
+            
+            try {
+                // Создаем AudioContext (если еще не создан)
+                if (!window.audioContext) {
+                    window.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                
+                preloadDiv.className = 'result';
+                preloadDiv.innerHTML = 'Начинаю предзагрузку всех аудиосэмплов...';
+                preloadDiv.style.display = 'block';
+                
+                const startTime = performance.now();
+                
+                // Предзагружаем все сэмплы
+                const result = await AudioBufferCache.preloadAllSamples(window.audioContext);
+                
+                const endTime = performance.now();
+                const loadTime = ((endTime - startTime) / 1000).toFixed(2);
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Результаты предзагрузки сэмплов:</strong><br><br>`;
+                html += `<strong>Время загрузки:</strong> ${loadTime} сек<br>`;
+                html += `<strong>Всего файлов:</strong> ${result.totalFiles}<br>`;
+                html += `<strong>Успешно загружено:</strong> ${result.loadedFiles}<br>`;
+                html += `<strong>Загружено с ошибками:</strong> ${result.failedFiles}<br>`;
+                html += `<strong>Статус:</strong> ${result.success ? '✅ Успешно' : '⚠️ С ошибками'}<br>`;
+                
+                if (result.errors.length > 0) {
+                    html += '<br><strong>Ошибки загрузки:</strong><br>';
+                    result.errors.forEach(error => {
+                        html += `- ${error.filePath}: ${error.error}<br>`;
+                    });
+                }
+                
+                preloadDiv.innerHTML = html;
+                
+                // Также выводим в консоль для детального анализа
+                console.log('Результаты предзагрузки сэмплов:', result);
+                
+            } catch (error) {
+                preloadDiv.className = 'result error';
+                preloadDiv.innerHTML = `
+                    <strong>Ошибка при предзагрузке сэмплов:</strong> ${error.message}
+                `;
+                console.error('Ошибка при предзагрузке сэмплов:', error);
+            }
+        }
+        
+        // Функция для отображения информации о кэше
+        function showCacheInfo() {
+            const cacheInfoDiv = document.getElementById('cacheInfoResult');
+            
+            try {
+                const cacheInfo = AudioBufferCache.getCacheInfo();
+                
+                // Формируем HTML для отображения информации о кэше
+                let html = `<strong>Информация о кэше аудиобуферов:</strong><br><br>`;
+                html += `<strong>Загружено файлов в кэше:</strong> ${cacheInfo.cachedFilesCount}<br>`;
+                html += `<strong>Статус загрузки:</strong> ${cacheInfo.isLoading ? '⏳ Загрузка...' : '✅ Готов'}<br>`;
+                html += `<strong>Ожидают загрузки:</strong> ${cacheInfo.pendingLoadsCount}<br>`;
+                
+                if (cacheInfo.cachedFilesCount > 0) {
+                    html += '<br><strong>Загруженные файлы:</strong><br>';
+                    html += '<div style="max-height: 200px; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">';
+                    cacheInfo.cachedFiles.forEach(filePath => {
+                        html += `- ${filePath}<br>`;
+                    });
+                    html += '</div>';
+                }
+                
+                if (cacheInfo.pendingLoadsCount > 0) {
+                    html += '<br><strong>Файлы в процессе загрузки:</strong><br>';
+                    cacheInfo.pendingLoads.forEach(filePath => {
+                        html += `- ${filePath}<br>`;
+                    });
+                }
+                
+                cacheInfoDiv.className = 'result';
+                cacheInfoDiv.innerHTML = html;
+                cacheInfoDiv.style.display = 'block';
+                
+                // Также выводим в консоль для детального анализа
+                console.log('Информация о кэше:', cacheInfo);
+                
+            } catch (error) {
+                cacheInfoDiv.className = 'result error';
+                cacheInfoDiv.innerHTML = `
+                    <strong>Ошибка при получении информации о кэше:</strong> ${error.message}
+                `;
+                console.error('Ошибка при получении информации о кэше:', error);
+            }
+        }
+        
+        // Функция для очистки кэша
+        function clearCache() {
+            const cacheInfoDiv = document.getElementById('cacheInfoResult');
+            
+            try {
+                const cacheInfo = AudioBufferCache.getCacheInfo();
+                const filesCount = cacheInfo.cachedFilesCount;
+                
+                // Очищаем кэш
+                AudioBufferCache.clearAudioBufferCache();
+                
+                // Формируем HTML для отображения результатов
+                let html = `<strong>Очистка кэша аудиобуферов:</strong><br><br>`;
+                html += `✅ Удалено ${filesCount} файлов из кэша<br>`;
+                html += `Кэш полностью очищен`;
+                
+                cacheInfoDiv.className = 'result';
+                cacheInfoDiv.innerHTML = html;
+                cacheInfoDiv.style.display = 'block';
+                
+                console.log(`Очищен кэш аудиобуферов, удалено ${filesCount} файлов`);
+                
+            } catch (error) {
+                cacheInfoDiv.className = 'result error';
+                cacheInfoDiv.innerHTML = `
+                    <strong>Ошибка при очистке кэша:</strong> ${error.message}
+                `;
+                console.error('Ошибка при очистке кэша:', error);
+            }
+        }
+        
+        // Функция для отображения поддерживаемых типов аккордов
+        function displaySupportedTypes() {
+            const typesDiv = document.getElementById('supportedTypes');
+            const types = ChordParser.getSupportedChordTypes();
+            
+            typesDiv.innerHTML = types.map(type => 
+                `<span class="chord-type">${type || '(неявный мажор)'}</span>`
+            ).join('');
+        }
+        
+        // Инициализация при загрузке страницы
+        window.onload = function() {
+            displaySupportedTypes();
+            
+            // Добавляем обработчики на кнопки
+            document.getElementById('parseButton').addEventListener('click', parseChordInput);
+            document.getElementById('matchButton').addEventListener('click', findPositions);
+            document.getElementById('optimizeButton').addEventListener('click', findOptimalFingering);
+            document.getElementById('mapAudioButton').addEventListener('click', mapToAudioFiles);
+            document.getElementById('testPitchShiftButton').addEventListener('click', testPitchShift);
+            document.getElementById('preloadButton').addEventListener('click', preloadAllSamples);
+            document.getElementById('cacheInfoButton').addEventListener('click', showCacheInfo);
+            document.getElementById('clearCacheButton').addEventListener('click', clearCache);
+            
+            // Добавляем обработчик для кнопки воспроизведения (будет добавлен динамически)
+            document.addEventListener('click', function(e) {
+                if (e.target && e.target.id === 'playChordButton') {
+                    playChord();
+                } else if (e.target && e.target.id === 'playOriginalButton') {
+                    playTestAudio('original');
+                } else if (e.target && e.target.id === 'playShiftedUpButton') {
+                    playTestAudio('shiftedUp');
+                } else if (e.target && e.target.id === 'playShiftedDownButton') {
+                    playTestAudio('shiftedDown');
+                }
+            });
+            
+            // Добавляем обработчики на примеры аккордов
+            document.querySelectorAll('.example-chord').forEach(element => {
+                element.addEventListener('click', function() {
+                    setChord(this.getAttribute('data-chord'));
+                });
+            });
+            
+            // Добавляем обработчик нажатия Enter в поле ввода
+            document.getElementById('chordInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    parseChordInput();
+                    findPositions();
+                    findOptimalFingering();
+                    mapToAudioFiles();
+                }
+            });
+            
+            // Тестируем пример из требований
+            console.log('Тест из требований:');
+            try {
+                const notes = ChordParser.parseChord('C#m7');
+                console.log(`parseChord('C#m7') -> [${notes.map(note => `"${note}"`).join(', ')}]`);
+                console.log('Результат:', Array.isArray(notes) && notes.length >= 2 ? '✅ Успешно' : '❌ Ошибка');
+                
+                // Тестируем новый алгоритм подбора аппликатур
+                console.log('\nТест подбора аппликатуры:');
+                const chordResult = ChordMatcher.findChordPositions(notes, 'C#m7');
+                console.log('findChordPositions(notes, "C#m7") ->', chordResult);
+                
+                // Проверяем результат
+                if (chordResult.shape) {
+                    console.log(`✅ Найдена аппликатура: ${chordResult.shape}`);
+                    console.log(`✅ Количество позиций в аппликатуре: ${chordResult.fingering.length}`);
+                } else {
+                    console.log('❌ Аппликатура не найдена');
+                }
+                
+                // Дополнительные тесты для разных типов аккордов
+                console.log('\nДополнительные тесты:');
+                const testChords = ['Em', 'C', 'G', 'Am', 'D'];
+                
+                testChords.forEach(chordName => {
+                    try {
+                        const testNotes = ChordParser.parseChord(chordName);
+                        const testResult = ChordMatcher.findChordPositions(testNotes, chordName);
+                        
+                        if (testResult.shape) {
+                            console.log(`✅ ${chordName}: найдена аппликатура "${testResult.shape}"`);
+                        } else {
+                            console.log(`❌ ${chordName}: аппликатура не найдена`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ ${chordName}: ошибка - ${error.message}`);
+                    }
+                });
+                
+                // Тестируем новый алгоритм оптимизации
+                console.log('\nТестирование алгоритма оптимизации аппликатур:');
+                const testChordsForOptimization = ['C', 'G', 'Am', 'Em', 'D'];
+                
+                testChordsForOptimization.forEach(chordName => {
+                    try {
+                        const testNotes = ChordParser.parseChord(chordName);
+                        const optimizeResult = ChordOptimizer.findOptimalFingering(testNotes, chordName);
+                        
+                        if (optimizeResult.bestFingering) {
+                            console.log(`✅ ${chordName}: найдена оптимальная аппликатура (оценка: ${optimizeResult.bestFingering.score.toFixed(2)})`);
+                            console.log(`   - Диапазон ладов: ${optimizeResult.bestFingering.fretRange}`);
+                            console.log(`   - Открытых струн: ${optimizeResult.bestFingering.openStrings}`);
+                            console.log(`   - Требует баррэ: ${optimizeResult.bestFingering.barreRequirement > 0 ? 'Да' : 'Нет'}`);
+                        } else {
+                            console.log(`❌ ${chordName}: оптимальная аппликатура не найдена`);
+                        }
+                    } catch (error) {
+                        console.error(`❌ ${chordName}: ошибка оптимизации - ${error.message}`);
+                    }
+                });
+                
+                // Тестируем сложный аккорд C#m7 из требований
+                console.log('\nТестирование сложного аккорда C#m7:');
+                try {
+                    const cSharpMinor7Notes = ChordParser.parseChord('C#m7');
+                    const cSharpMinor7Result = ChordOptimizer.findOptimalFingering(cSharpMinor7Notes, 'C#m7');
+                    
+                    if (cSharpMinor7Result.bestFingering) {
+                        console.log(`✅ C#m7: найдена оптимальная аппликатура (оценка: ${cSharpMinor7Result.bestFingering.score.toFixed(2)})`);
+                        console.log(`   - Всего комбинаций: ${cSharpMinor7Result.totalCombinations}`);
+                        console.log(`   - Валидных комбинаций: ${cSharpMinor7Result.validCombinations}`);
+                        console.log(`   - Найдена хорошая аппликатура: ${cSharpMinor7Result.hasGoodFingering ? 'Да' : 'Нет'}`);
+                    } else {
+                        console.log(`❌ C#m7: оптимальная аппликатура не найдена`);
+                    }
+                } catch (error) {
+                    console.error(`❌ C#m7: ошибка оптимизации - ${error.message}`);
+                }
+                
+                // Тестируем новый модуль сопоставления с аудиофайлами
+                console.log('\nТестирование модуля сопоставления с аудиофайлами:');
+                (async function() {
+                    try {
+                        // Создаем тестовую аппликатуру для аккорда C
+                        const testFingering = [
+                            { string: "6E", fret: -1, note: null }, // Mute
+                            { string: "5A", fret: 3, note: "C" },
+                            { string: "4D", fret: 2, note: "E" },
+                            { string: "3G", fret: 0, note: "G" },
+                            { string: "2B", fret: 1, note: "C" },
+                            { string: "1e", fret: 0, note: "E" }
+                        ];
+                        
+                        console.log('Тестовая аппликатура для аккорда C:', testFingering);
+                        
+                        // Проверяем функцию getAudioFilePaths
+                        const audioFilePaths = await AudioMapper.getAudioFilePaths(testFingering);
+                        console.log('Пути к аудиофайлам:', audioFilePaths);
+                        
+                        // Проверяем функцию getMappingInfo
+                        const mappingInfo = await AudioMapper.getMappingInfo(testFingering);
+                        console.log('Информация о сопоставлении:', mappingInfo);
+                        
+                        if (mappingInfo.success) {
+                            console.log('✅ Модуль сопоставления с аудиофайлами работает корректно');
+                        } else {
+                            console.log('❌ Модуль сопоставления с аудиофайлами имеет ошибки');
+                        }
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка при тестировании модуля сопоставления:', error.message);
+                    }
+                })();
+                
+                // Тестируем новый модуль кэширования аудиобуферов
+                console.log('\nТестирование модуля кэширования аудиобуферов:');
+                (async function() {
+                    try {
+                        // Создаем AudioContext для тестов
+                        const testAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        console.log('1. Тестирование загрузки одного файла:');
+                        // Тестируем загрузку одного файла
+                        const singleFilePath = 'samples/1e/fret0.mp3';
+                        const singleBuffer = await AudioBufferCache.loadAndCacheAudioBuffer(testAudioContext, singleFilePath);
+                        
+                        if (singleBuffer) {
+                            console.log(`✅ Успешно загружен и закэширован файл: ${singleFilePath}`);
+                            console.log(`   - Длительность: ${singleBuffer.duration.toFixed(2)} сек`);
+                            console.log(`   - Частота дискретизации: ${singleBuffer.sampleRate} Гц`);
+                            console.log(`   - Каналов: ${singleBuffer.numberOfChannels}`);
+                        } else {
+                            console.log(`❌ Не удалось загрузить файл: ${singleFilePath}`);
+                        }
+                        
+                        console.log('\n2. Тестирование проверки кэша:');
+                        // Проверяем, что файл теперь в кэше
+                        const isCached = AudioBufferCache.isAudioBufferCached(singleFilePath);
+                        console.log(`Файл в кэше: ${isCached ? '✅ Да' : '❌ Нет'}`);
+                        
+                        // Получаем буфер из кэша
+                        const cachedBuffer = AudioBufferCache.getCachedAudioBuffer(singleFilePath);
+                        if (cachedBuffer) {
+                            console.log(`✅ Буфер успешно получен из кэша`);
+                            console.log(`   - Длительность: ${cachedBuffer.duration.toFixed(2)} сек`);
+                        } else {
+                            console.log(`❌ Не удалось получить буфер из кэша`);
+                        }
+                        
+                        console.log('\n3. Тестирование загрузки нескольких файлов:');
+                        // Тестируем загрузку нескольких файлов
+                        const multipleFilePaths = [
+                            'samples/1e/fret0.mp3',
+                            'samples/2B/fret1.mp3',
+                            'samples/3G/fret2.mp3'
+                        ];
+                        
+                        const multipleResult = await AudioBufferCache.loadAndCacheAudioBuffers(testAudioContext, multipleFilePaths);
+                        
+                        console.log(`Результат загрузки нескольких файлов:`);
+                        console.log(`   - Всего файлов: ${multipleResult.totalFiles}`);
+                        console.log(`   - Успешно загружено: ${multipleResult.loadedFiles}`);
+                        console.log(`   - С ошибками: ${multipleResult.failedFiles}`);
+                        console.log(`   - Статус: ${multipleResult.success ? '✅ Успешно' : '⚠️ С ошибками'}`);
+                        
+                        if (multipleResult.errors.length > 0) {
+                            console.log('Ошибки:');
+                            multipleResult.errors.forEach(error => {
+                                console.log(`   - ${error.filePath}: ${error.error}`);
+                            });
+                        }
+                        
+                        console.log('\n4. Тестирование информации о кэше:');
+                        // Получаем информацию о кэше
+                        const cacheInfo = AudioBufferCache.getCacheInfo();
+                        console.log('Информация о кэше:');
+                        console.log(`   - Загружено файлов: ${cacheInfo.cachedFilesCount}`);
+                        console.log(`   - Идет загрузка: ${cacheInfo.isLoading ? 'Да' : 'Нет'}`);
+                        console.log(`   - Ожидают загрузки: ${cacheInfo.pendingLoadsCount}`);
+                        
+                        console.log('\n5. Тестирование очистки кэша:');
+                        // Очищаем кэш для одного файла
+                        AudioBufferCache.clearAudioBufferCache([singleFilePath]);
+                        console.log(`✅ Очищен кэш для файла: ${singleFilePath}`);
+                        
+                        // Проверяем, что файл удален из кэша
+                        const isStillCached = AudioBufferCache.isAudioBufferCached(singleFilePath);
+                        console.log(`Файл все еще в кэше: ${isStillCached ? '❌ Да' : '✅ Нет'}`);
+                        
+                        console.log('\n6. Тестирование предзагрузки всех сэмплов (ограниченный тест):');
+                        // Тестируем предзагрузку с ограничением по ладам
+                        const preloadResult = await AudioBufferCache.preloadAllSamples(testAudioContext, { maxFret: 1 });
+                        
+                        console.log(`Результат предзагрузки (лады 0-1):`);
+                        console.log(`   - Всего файлов: ${preloadResult.totalFiles}`);
+                        console.log(`   - Успешно загружено: ${preloadResult.loadedFiles}`);
+                        console.log(`   - С ошибками: ${preloadResult.failedFiles}`);
+                        console.log(`   - Статус: ${preloadResult.success ? '✅ Успешно' : '⚠️ С ошибками'}`);
+                        
+                        console.log('\n✅ Модуль кэширования аудиобуферов успешно протестирован');
+                        
+                        // Закрываем тестовый AudioContext
+                        await testAudioContext.close();
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка при тестировании модуля кэширования:', error.message);
+                    }
+                })();
+                
+                // Тестируем новый модуль PitchShift
+                console.log('\nТестирование модуля PitchShift:');
+                (async function() {
+                    try {
+                        // Создаем AudioContext для тестов
+                        const testAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+                        
+                        console.log('1. Тестирование оценки качества транспонирования:');
+                        // Тестируем оценку качества для разных значений
+                        const testSemitones = [-3, -2, -1, 0, 1, 2, 3];
+                        testSemitones.forEach(semitones => {
+                            const qualityInfo = window.PitchShift.assessPitchShiftQuality(semitones);
+                            console.log(`  ${semitones > 0 ? '+' : ''}${semitones} полутонов: ${qualityInfo.quality} качество (${qualityInfo.isHighQuality ? 'высокое' : 'низкое'}), ${qualityInfo.cents} центов`);
+                        });
+                        
+                        console.log('\n2. Тестирование загрузки и транспонирования аудиофайла:');
+                        // Загружаем тестовый аудиофайл
+                        const testFilePath = 'samples/1e/fret0.mp3';
+                        const testBuffer = await AudioBufferCache.loadAndCacheAudioBuffer(testAudioContext, testFilePath);
+                        
+                        if (testBuffer) {
+                            console.log(`✅ Загружен тестовый файл: ${testFilePath}`);
+                            console.log(`   - Длительность: ${testBuffer.duration.toFixed(2)} сек`);
+                            console.log(`   - Частота дискретизации: ${testBuffer.sampleRate} Гц`);
+                            console.log(`   - Каналов: ${testBuffer.numberOfChannels}`);
+                            
+                            // Тестируем транспонирование на 1 полутон вверх
+                            console.log('\n3. Тестирование транспонирования на +1 полутон:');
+                            const pitchShiftResult = await window.PitchShift.pitchShiftWebAudio(testAudioContext, testBuffer, 1);
+                            
+                            if (pitchShiftResult.transformation.applied) {
+                                console.log(`✅ Транспонирование успешно применено`);
+                                console.log(`   - Алгоритм: ${pitchShiftResult.transformation.algorithm}`);
+                                console.log(`   - Качество: ${pitchShiftResult.quality.quality} (${pitchShiftResult.quality.isHighQuality ? 'высокое' : 'низкое'})`);
+                                console.log(`   - Коэффициент изменения: ${pitchShiftResult.transformation.pitchRatio.toFixed(4)}`);
+                                console.log(`   - Точность: ${Math.abs(pitchShiftResult.quality.cents)} центов`);
+                            } else {
+                                console.log(`❌ Транспонирование не было применено`);
+                            }
+                            
+                            // Тестируем транспонирование на 2 полутона вниз
+                            console.log('\n4. Тестирование транспонирования на -2 полутона:');
+                            const pitchShiftResult2 = await window.PitchShift.pitchShiftWebAudio(testAudioContext, testBuffer, -2);
+                            
+                            if (pitchShiftResult2.transformation.applied) {
+                                console.log(`✅ Транспонирование успешно применено`);
+                                console.log(`   - Алгоритм: ${pitchShiftResult2.transformation.algorithm}`);
+                                console.log(`   - Качество: ${pitchShiftResult2.quality.quality} (${pitchShiftResult2.quality.isHighQuality ? 'высокое' : 'низкое'})`);
+                                console.log(`   - Коэффициент изменения: ${pitchShiftResult2.transformation.pitchRatio.toFixed(4)}`);
+                                console.log(`   - Точность: ${Math.abs(pitchShiftResult2.quality.cents)} центов`);
+                            } else {
+                                console.log(`❌ Транспонирование не было применено`);
+                            }
+                            
+                            // Тестируем транспонирование на 3 полутона (низкое качество)
+                            console.log('\n5. Тестирование транспонирования на +3 полутона (низкое качество):');
+                            const pitchShiftResult3 = await window.PitchShift.pitchShiftWebAudio(testAudioContext, testBuffer, 3);
+                            
+                            if (pitchShiftResult3.transformation.applied) {
+                                console.log(`✅ Транспонирование успешно применено`);
+                                console.log(`   - Алгоритм: ${pitchShiftResult3.transformation.algorithm}`);
+                                console.log(`   - Качество: ${pitchShiftResult3.quality.quality} (${pitchShiftResult3.quality.isHighQuality ? 'высокое' : 'низкое'})`);
+                                console.log(`   - Коэффициент изменения: ${pitchShiftResult3.transformation.pitchRatio.toFixed(4)}`);
+                                console.log(`   - Точность: ${Math.abs(pitchShiftResult3.quality.cents)} центов`);
+                                
+                                if (!pitchShiftResult3.quality.isHighQuality) {
+                                    console.log(`⚠️ Предупреждение: транспонирование превышает порог высокого качества (±${window.PitchShift.MAX_HIGH_QUALITY_SEMITONES} полутона)`);
+                                }
+                            } else {
+                                console.log(`❌ Транспонирование не было применено`);
+                            }
+                        } else {
+                            console.log(`❌ Не удалось загрузить тестовый файл: ${testFilePath}`);
+                        }
+                        
+                        console.log('\n✅ Модуль PitchShift успешно протестирован');
+                        
+                        // Закрываем тестовый AudioContext
+                        await testAudioContext.close();
+                        
+                    } catch (error) {
+                        console.error('❌ Ошибка при тестировании модуля PitchShift:', error.message);
+                    }
+                })();
+                
+            } catch (error) {
+                console.error('❌ Ошибка в тесте из требований:', error.message);
+            }
+        };
+    </script>
+</body>
+</html>
