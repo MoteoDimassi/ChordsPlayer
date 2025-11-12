@@ -387,6 +387,44 @@ function findLowestRootNote(rootNote) {
 }
 
 /**
+ * Находит корневую ноту на открытой струне
+ *
+ * ПРАВИЛО: Если есть возможность найти корневую ноту на открытой струне,
+ * тогда делать аппликатуру именно от этой ноты
+ *
+ * @param {string} rootNote - Тоника аккорда
+ * @returns {Object|null} - Информация о корневой ноте на открытой струне или null
+ */
+function findRootNoteOnOpenString(rootNote) {
+  // Проверяем каждую открытую струну (лад 0)
+  const openStrings = ["6E", "5A", "4D", "3G", "2B", "1e"];
+  
+  console.log(`Проверяем наличие корневой ноты "${rootNote}" на открытых струнах...`);
+  
+  for (const string of openStrings) {
+    const openNote = OPTIMIZER_NOTES_DATA[string][0];
+    if (!openNote) continue;
+    
+    const noteName = extractNoteName(openNote);
+    
+    // Если на открытой струне есть корневая нота
+    if (noteName === rootNote) {
+      console.log(`Найдена корневая нота "${rootNote}" на открытой струне ${string}`);
+      return {
+        note: noteName,
+        string: string,
+        fret: 0,
+        midi: calculateMidiNumber(openNote),
+        octave: extractOctave(openNote)
+      };
+    }
+  }
+  
+  console.log(`Корневая нота "${rootNote}" не найдена на открытых струнах`);
+  return null;
+}
+
+/**
  * Вычисляет MIDI номер ноты
  * @param {string} noteWithOctave - Нота с октавой (например, "C#4")
  * @returns {number} - MIDI номер ноты
@@ -626,24 +664,35 @@ function findOptimalFingering(chordNotes, chordName = '', options = {}) {
   // 1. Определяем корневую ноту аккорда (тоника)
   const rootNote = chordNotes[0];
   
-  // 2. Находим самую низкую корневую ноту на грифе
-  const lowestRoot = findLowestRootNote(rootNote);
+  // 2. Сначала проверяем, есть ли корневая нота на открытой струне
+  const openStringRoot = findRootNoteOnOpenString(rootNote);
   
-  if (!lowestRoot) {
-    console.warn(`Не найдена корневая нота "${rootNote}" на грифе в пределах ладов 0-4`);
-    return {
-      chordName: chordName,
-      notes: chordNotes,
-      totalCombinations: 0,
-      validCombinations: 0,
-      hasGoodFingering: false,
-      topFingerings: [],
-      bestFingering: null
-    };
+  let rootPosition;
+  if (openStringRoot) {
+    rootPosition = openStringRoot;
+    console.log(`Корневая нота "${rootNote}" найдена на открытой струне ${rootPosition.string}`);
+  } else {
+    // Если нет на открытой струне, ищем самую низкую ноту (тонику) на грифе
+    rootPosition = findLowestRootNote(rootNote);
+    
+    if (!rootPosition) {
+      console.warn(`Не найдена тоника "${rootNote}" на грифе в пределах ладов 0-4`);
+      return {
+        chordName: chordName,
+        notes: chordNotes,
+        totalCombinations: 0,
+        validCombinations: 0,
+        hasGoodFingering: false,
+        topFingerings: [],
+        bestFingering: null
+      };
+    }
+    
+    console.log(`Тоника "${rootNote}" найдена на струне ${rootPosition.string}, лад ${rootPosition.fret}`);
   }
   
   // 3. Строим аппликатуру на основе положения корневой ноты
-  const primaryFingering = buildChordFromRoot(rootNote, chordNotes, lowestRoot, chordName);
+  const primaryFingering = buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName);
   
   // Если основная аппликатура не построена, пробуем альтернативные подходы
   if (!primaryFingering) {
@@ -761,7 +810,8 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateFretRange,
     countOpenStrings,
     calculateBarreRequirement,
-    calculateStandardChordMatch
+    calculateStandardChordMatch,
+    findRootNoteOnOpenString
   };
 } else {
   // Для использования в браузере
@@ -775,6 +825,7 @@ if (typeof module !== 'undefined' && module.exports) {
     calculateFretRange,
     countOpenStrings,
     calculateBarreRequirement,
-    calculateStandardChordMatch
+    calculateStandardChordMatch,
+    findRootNoteOnOpenString
   };
 }
