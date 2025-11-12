@@ -95,7 +95,7 @@ async function loadAlternativeFile(audioContext, originalFilePath) {
   }
   
   // Если открытая струна не сработала, пробуем другие лады
-  for (let fret = 1; fret <= 4; fret++) {
+  for (let fret = 1; fret <= 7; fret++) {
     const alternativePath = `samples/${stringFolder}/fret${fret}.mp3`;
     
     // Пропускаем оригинальный файл
@@ -320,7 +320,7 @@ function getCacheInfo() {
  */
 async function preloadAllSamples(audioContext, options = {}) {
   const {
-    maxFret = 4,
+    maxFret = 7,
     forceReload = false
   } = options;
   

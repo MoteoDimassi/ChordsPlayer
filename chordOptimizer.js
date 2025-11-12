@@ -8,12 +8,12 @@
 
 // Загрузка данных о нотах (в реальном приложении это может быть загружено из файла)
 const OPTIMIZER_NOTES_DATA = {
-  "6E": ["E1", "F1", "F#1", "G1", "G#1"],
-  "5A": ["A1", "A#1", "B1", "C2", "C#2"],
-  "4D": ["D2", "D#2", "E2", "F2", "F#2"],
-  "3G": ["G2", "G#2", "A2", "A#2", "B2"],
-  "2B": ["B2", "C2", "C#2", "D2", "D#2"],
-  "1e": ["E3", "F3", "F#3", "G3", "G#3"]
+  "6E": ["E1", "F1", "F#1", "G1", "G#1", "A1", "A#1", "B1"],
+  "5A": ["A1", "A#1", "B1", "C2", "C#2", "D2", "D#2", "E2"],
+  "4D": ["D2", "D#2", "E2", "F2", "F#2", "G2", "G#2", "A2"],
+  "3G": ["G2", "G#2", "A2", "A#2", "B2", "C3", "C#3", "D3"],
+  "2B": ["B2", "C2", "C#2", "D2", "D#2", "E3", "F3", "F#3"],
+  "1e": ["E3", "F3", "F#3", "G3", "G#3", "A3", "A#3", "B3"]
 };
 
 // Порядок струн от самой низкой к самой высокой
@@ -96,7 +96,9 @@ function findAllPossiblePositions(chordNotes) {
   // Проходим по каждой струне
   Object.keys(OPTIMIZER_NOTES_DATA).forEach(string => {
     // Проходим по каждому ладу от 0 до 4
-    OPTIMIZER_NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+    for (let fret = 0; fret <= 7; fret++) {
+      const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+      if (!noteWithOctave) continue;
       const noteName = extractNoteName(noteWithOctave);
       
       // Проверяем, является ли нота частью аккорда
@@ -108,7 +110,7 @@ function findAllPossiblePositions(chordNotes) {
           note: noteName
         });
       }
-    });
+    }
   });
   
   return result;
@@ -517,7 +519,7 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
     
     // Если не нашли на открытой струне, ищем в диапазоне вокруг корневой ноты
     if (!foundPosition) {
-      for (let fret = Math.max(0, rootFret - 2); fret <= Math.min(4, rootFret + 2); fret++) {
+      for (let fret = Math.max(0, rootFret - 2); fret <= Math.min(7, rootFret + 2); fret++) {
         // Пропускаем лад 0, так как уже проверили
         if (fret === 0) continue;
         
@@ -552,7 +554,7 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
       
       // Если не нашли на открытой струне, ищем по остальным ладам
       if (!foundPosition) {
-        for (let fret = 1; fret <= 4; fret++) {
+        for (let fret = 1; fret <= 7; fret++) {
           const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
           if (!noteWithOctave) continue;
           

@@ -71,7 +71,7 @@ async function loadAudioFile(audioContext, filePath) {
  * @param {number} maxFret - Максимальный доступный лад
  * @returns {number|null} - Ближайший доступный лад или null
  */
-function findClosestFret(string, targetFret, maxFret = 4) {
+function findClosestFret(string, targetFret, maxFret = 7) {
   // Проверяем доступные лады от 0 до maxFret
   for (let distance = 0; distance <= maxFret; distance++) {
     // Проверяем лад выше
@@ -250,7 +250,7 @@ async function mapFingeringToSamples(fingering, audioContext, options = {}) {
           }
         } else if (enablePitchShift) {
           // Файл не существует, пробуем найти ближайший и транспонировать
-          const closestFret = findClosestFret(string, fret);
+          const closestFret = findClosestFret(string, fret, 7);
           
           if (closestFret !== null) {
             const closestFilePath = `${SAMPLES_PATH}/${string}/fret${closestFret}${AUDIO_EXTENSION}`;

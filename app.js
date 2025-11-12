@@ -343,7 +343,7 @@ function drawFretboard() {
     const width = 600;
     const height = 200;
     const stringCount = 6;
-    const fretCount = 5;
+    const fretCount = 8;
     const margin = 30;
     const fretWidth = (width - 2 * margin) / fretCount;
     const stringSpacing = (height - 2 * margin) / (stringCount - 1);
@@ -367,6 +367,8 @@ function drawFretboard() {
         text.setAttribute('x', margin - 15);
         text.setAttribute('y', y + 5);
         text.setAttribute('class', 'string-label');
+        text.setAttribute('text-anchor', 'middle');
+        text.setAttribute('dominant-baseline', 'middle');
         text.textContent = ['E', 'A', 'D', 'G', 'B', 'e'][i];
         svg.appendChild(text);
     }
@@ -398,9 +400,12 @@ function drawFretboard() {
         // Добавляем метки ладов
         if (i > 0) {
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-            text.setAttribute('x', x - fretWidth / 2);
+            // Позиционируем метку немного правее центра лада для лучшей визуализации
+            const labelX = x - fretWidth / 4;
+            text.setAttribute('x', labelX);
             text.setAttribute('y', margin - 10);
             text.setAttribute('class', 'fret-label');
+            text.setAttribute('text-anchor', 'middle');
             text.textContent = i.toString();
             svg.appendChild(text);
         }
@@ -418,7 +423,7 @@ function displayFingering(fingering) {
     const width = 600;
     const height = 200;
     const stringCount = 6;
-    const fretCount = 5;
+    const fretCount = 8; // Исправляем: должно соответствовать количеству ладов в drawFretboard()
     const margin = 30;
     const fretWidth = (width - 2 * margin) / fretCount;
     const stringSpacing = (height - 2 * margin) / (stringCount - 1);
@@ -461,7 +466,9 @@ function displayFingering(fingering) {
             svg.appendChild(circle);
         } else {
             // Активная струна - рисуем круг
-            const x = margin + position.fret * fretWidth - fretWidth / 2;
+            // Позиция круга должна совпадать с позицией метки лада
+            // Используем ту же формулу, что и для меток ладов: margin + fret * fretWidth - fretWidth / 4
+            const x = margin + position.fret * fretWidth - fretWidth / 4;
             
             const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
             circle.setAttribute('cx', x);
@@ -478,6 +485,7 @@ function displayFingering(fingering) {
             text.setAttribute('y', y + 4);
             text.setAttribute('class', 'finger-position-text');
             text.setAttribute('text-anchor', 'middle');
+            text.setAttribute('dominant-baseline', 'middle');
             text.textContent = position.fret.toString();
             svg.appendChild(text);
         }
@@ -771,7 +779,7 @@ async function preloadAudioFiles() {
     try {
         addLogEntry('Начало предзагрузки аудиофайлов...', 'info');
         
-        const result = await AudioBufferCache.preloadAllSamples(audioContext, { maxFret: 2 });
+        const result = await AudioBufferCache.preloadAllSamples(audioContext, { maxFret: 7 });
         
         if (result.success) {
             addLogEntry(`Предзагрузка завершена: ${result.loadedFiles}/${result.totalFiles} файлов загружено`, 'success');

@@ -433,3 +433,11 @@ footer {
     fill: #666;
     text-anchor: middle;
 }
+
+.fretboard .finger-position-text {
+    font-size: 10px;
+    fill: white;
+    font-weight: bold;
+    text-anchor: middle;
+    dominant-baseline: middle;
+}

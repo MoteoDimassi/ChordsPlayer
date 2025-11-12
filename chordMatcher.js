@@ -6,12 +6,12 @@
 
 // Загрузка данных о нотах (в реальном приложении это может быть загружено из файла)
 const NOTES_DATA = {
-  "6E": ["E1", "F1", "F#1", "G1", "G#1"],
-  "5A": ["A1", "A#1", "B1", "C2", "C#2"],
-  "4D": ["D2", "D#2", "E2", "F2", "F#2"],
-  "3G": ["G2", "G#2", "A2", "A#2", "B2"],
-  "2B": ["B2", "C2", "C#2", "D2", "D#2"],
-  "1e": ["E3", "F3", "F#3", "G3", "G#3"]
+  "6E": ["E1", "F1", "F#1", "G1", "G#1", "A1", "A#1", "B1"],
+  "5A": ["A1", "A#1", "B1", "C2", "C#2", "D2", "D#2", "E2"],
+  "4D": ["D2", "D#2", "E2", "F2", "F#2", "G2", "G#2", "A2"],
+  "3G": ["G2", "G#2", "A2", "A#2", "B2", "C3", "C#3", "D3"],
+  "2B": ["B2", "C2", "C#2", "D2", "D#2", "E3", "F3", "F#3"],
+  "1e": ["E3", "F3", "F#3", "G3", "G#3", "A3", "A#3", "B3"]
 };
 
 // MIDI номера нот для вычисления (C4 = MIDI 60)
@@ -197,6 +197,46 @@ function findLowestRootNote(chordNotes) {
 }
 
 /**
+ * Находит корневую ноту на открытой струне
+ *
+ * ПРАВИЛО: Если есть возможность найти корневую ноту на открытой струне,
+ * тогда делать аппликатуру именно от этой ноты
+ *
+ * @param {Array} chordNotes - Ноты аккорда
+ * @returns {Object|null} - Информация о корневой ноте на открытой струне или null
+ */
+function findRootNoteOnOpenString(chordNotes) {
+  const rootNote = chordNotes[0];
+  
+  // Проверяем каждую открытую струну (лад 0)
+  const openStrings = ["6E", "5A", "4D", "3G", "2B", "1e"];
+  
+  console.log(`Проверяем наличие корневой ноты "${rootNote}" на открытых струнах...`);
+  
+  for (const string of openStrings) {
+    const openNote = NOTES_DATA[string][0];
+    if (!openNote) continue;
+    
+    const noteName = extractNoteName(openNote);
+    
+    // Если на открытой струне есть корневая нота
+    if (noteName === rootNote) {
+      console.log(`Найдена корневая нота "${rootNote}" на открытой струне ${string}`);
+      return {
+        note: noteName,
+        string: string,
+        fret: 0,
+        midi: calculateMidiNumber(openNote),
+        octave: extractOctave(openNote)
+      };
+    }
+  }
+  
+  console.log(`Корневая нота "${rootNote}" не найдена на открытых струнах`);
+  return null;
+}
+
+/**
  * Подбирает аппликатуру для аккорда на основе 5 основных типов
  * @param {Array} chordNotes - Ноты аккорда
  * @param {string} chordName - Название аккорда (для определения типа)
@@ -209,33 +249,42 @@ function findChordShape(chordNotes, chordName) {
   // Определяем, является ли аккорд мажорным или минорным
   const isMajor = isChordMajor(chordNotes, rootNote);
   
-  // Находим самую низкую ноту (тонику) на грифе
-  const lowestRoot = findLowestRootNote(chordNotes);
+  // Сначала проверяем, есть ли корневая нота на открытой струне
+  const openStringRoot = findRootNoteOnOpenString(chordNotes);
   
-  if (!lowestRoot) {
-    console.warn(`Не найдена тоника "${rootNote}" на грифе в пределах ладов 0-4`);
-    return null;
+  let rootPosition;
+  if (openStringRoot) {
+    rootPosition = openStringRoot;
+    console.log(`Корневая нота "${rootNote}" найдена на открытой струне ${rootPosition.string}`);
+  } else {
+    // Если нет на открытой струне, ищем самую низкую ноту (тонику) на грифе
+    rootPosition = findLowestRootNote(chordNotes);
+    
+    if (!rootPosition) {
+      console.warn(`Не найдена тоника "${rootNote}" на грифе в пределах ладов 0-4`);
+      return null;
+    }
+    
+    console.log(`Тоника "${rootNote}" найдена на струне ${rootPosition.string}, лад ${rootPosition.fret}`);
   }
-  
-  console.log(`Тоника "${rootNote}" найдена на струне ${lowestRoot.string}, лад ${lowestRoot.fret}`);
   
   // Определяем возможные типы аппликатур на основе положения тоники
   let possibleShapes = [];
   
   // Если тоника на 6-й струне
-  if (lowestRoot.string === "6E") {
+  if (rootPosition.string === "6E") {
     possibleShapes = isMajor ?
       [CHORD_SHAPES.SHAPE_6_MAJOR] :
       [CHORD_SHAPES.SHAPE_6_MINOR];
   }
   // Если тоника на 5-й струне
-  else if (lowestRoot.string === "5A") {
+  else if (rootPosition.string === "5A") {
     possibleShapes = isMajor ?
       [CHORD_SHAPES.SHAPE_5_MAJOR] :
       [CHORD_SHAPES.SHAPE_5_MINOR];
   }
   // Если тоника на 4-й струне
-  else if (lowestRoot.string === "4D") {
+  else if (rootPosition.string === "4D") {
     possibleShapes = [CHORD_SHAPES.SHAPE_4];
   }
   // Если тоника на других струнах, пробуем все варианты
@@ -251,12 +300,12 @@ function findChordShape(chordNotes, chordName) {
   
   // Пробуем найти подходящую аппликатуру
   for (const shape of possibleShapes) {
-    const fingering = tryShape(chordNotes, rootNote, shape, lowestRoot);
+    const fingering = tryShape(chordNotes, rootNote, shape, rootPosition);
     if (fingering) {
       return {
         shape: shape.name,
         fingering: fingering,
-        rootPosition: lowestRoot
+        rootPosition: rootPosition
       };
     }
   }
@@ -306,7 +355,7 @@ function tryShape(chordNotes, rootNote, shape, rootPosition) {
     // Ищем позицию для этой ноты на струне
     let foundPosition = null;
     
-    for (let fret = 0; fret <= 4; fret++) {
+    for (let fret = 0; fret <= 7; fret++) {
       const noteWithOctave = NOTES_DATA[string][fret];
       if (!noteWithOctave) continue;
       
@@ -428,7 +477,9 @@ function findAllPossiblePositions(chordNotes) {
   // Проходим по каждой струне
   Object.keys(NOTES_DATA).forEach(string => {
     // Проходим по каждому ладу от 0 до 4
-    NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+    for (let fret = 0; fret <= 7; fret++) {
+      const noteWithOctave = NOTES_DATA[string][fret];
+      if (!noteWithOctave) continue;
       const noteName = extractNoteName(noteWithOctave);
       
       // Проверяем, является ли нота частью аккорда
@@ -444,7 +495,7 @@ function findAllPossiblePositions(chordNotes) {
           octave: octave
         });
       }
-    });
+    }
   });
   
   // Проверяем, для каких нот не найдено позиций
@@ -473,6 +524,7 @@ if (typeof module !== 'undefined' && module.exports) {
     logPositions,
     findChordShape,
     findLowestRootNote,
+    findRootNoteOnOpenString,
     isChordMajor,
     getNoteDegree,
     extractNoteName,
@@ -487,6 +539,7 @@ if (typeof module !== 'undefined' && module.exports) {
     logPositions,
     findChordShape,
     findLowestRootNote,
+    findRootNoteOnOpenString,
     isChordMajor,
     getNoteDegree,
     extractNoteName,
