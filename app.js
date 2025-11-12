@@ -429,8 +429,8 @@ function displayFingering(fingering) {
         const y = margin + stringIndex * stringSpacing;
         
         if (position.fret === -1) {
-            // Немая струна - рисуем крестик
-            const x = margin - fretWidth / 2;
+            // Немая струна - рисуем крестик на порожке
+            const x = margin + 5; // Немного правее порожка для видимости
             
             const line1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line1.setAttribute('x1', x - 5);
@@ -447,6 +447,18 @@ function displayFingering(fingering) {
             line2.setAttribute('y2', y - 5);
             line2.setAttribute('class', 'finger-position muted');
             svg.appendChild(line2);
+        } else if (position.fret === 0) {
+            // Открытая струна - рисуем чёрный кружок на порожке
+            const x = margin + 5; // Немного правее порожка для видимости
+            
+            const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+            circle.setAttribute('cx', x);
+            circle.setAttribute('cy', y);
+            circle.setAttribute('r', 8);
+            circle.setAttribute('class', 'finger-position open');
+            circle.setAttribute('data-string', position.string);
+            circle.setAttribute('data-fret', position.fret);
+            svg.appendChild(circle);
         } else {
             // Активная струна - рисуем круг
             const x = margin + position.fret * fretWidth - fretWidth / 2;

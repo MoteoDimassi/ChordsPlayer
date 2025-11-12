@@ -503,25 +503,24 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
     // Ищем позицию для этой ноты на струне
     let foundPosition = null;
     
-    // Сначала ищем на том же ладу, что и корневая нота
-    for (let fret = Math.max(0, rootFret - 2); fret <= Math.min(4, rootFret + 2); fret++) {
-      const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
-      if (!noteWithOctave) continue;
-      
-      const noteName = extractNoteName(noteWithOctave);
-      if (noteName === targetNote) {
+    // Сначала проверяем открытую струну (fret: 0) - она всегда должна рассматриваться
+    if (OPTIMIZER_NOTES_DATA[string][0]) {
+      const openNoteName = extractNoteName(OPTIMIZER_NOTES_DATA[string][0]);
+      if (openNoteName === targetNote) {
         foundPosition = {
           string: string,
-          fret: fret,
-          note: noteName
+          fret: 0,
+          note: openNoteName
         };
-        break;
       }
     }
     
-    // Если не нашли рядом с корневой нотой, ищем по всем ладам
+    // Если не нашли на открытой струне, ищем в диапазоне вокруг корневой ноты
     if (!foundPosition) {
-      for (let fret = 0; fret <= 4; fret++) {
+      for (let fret = Math.max(0, rootFret - 2); fret <= Math.min(4, rootFret + 2); fret++) {
+        // Пропускаем лад 0, так как уже проверили
+        if (fret === 0) continue;
+        
         const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
         if (!noteWithOctave) continue;
         
@@ -533,6 +532,39 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
             note: noteName
           };
           break;
+        }
+      }
+    }
+    
+    // Если не нашли рядом с корневой нотой, ищем по всем ладам
+    if (!foundPosition) {
+      // Сначала проверяем открытую струну (если еще не проверена)
+      if (OPTIMIZER_NOTES_DATA[string][0]) {
+        const openNoteName = extractNoteName(OPTIMIZER_NOTES_DATA[string][0]);
+        if (openNoteName === targetNote) {
+          foundPosition = {
+            string: string,
+            fret: 0,
+            note: openNoteName
+          };
+        }
+      }
+      
+      // Если не нашли на открытой струне, ищем по остальным ладам
+      if (!foundPosition) {
+        for (let fret = 1; fret <= 4; fret++) {
+          const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+          if (!noteWithOctave) continue;
+          
+          const noteName = extractNoteName(noteWithOctave);
+          if (noteName === targetNote) {
+            foundPosition = {
+              string: string,
+              fret: fret,
+              note: noteName
+            };
+            break;
+          }
         }
       }
     }

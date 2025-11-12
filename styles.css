@@ -409,6 +409,19 @@ footer {
     stroke: #7f8c8d;
 }
 
+.fretboard .finger-position.open {
+    fill: #000;
+    stroke: #000;
+    stroke-width: 2;
+}
+
+.fretboard .finger-position.open.active {
+    fill: #2ecc71;
+    stroke: #27ae60;
+    stroke-width: 2;
+    animation: pulse 1s infinite;
+}
+
 .fretboard .string-label {
     font-size: 12px;
     fill: #333;
