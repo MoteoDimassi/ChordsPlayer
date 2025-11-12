@@ -313,33 +313,62 @@ function getCacheInfo() {
 }
 
 /**
- * Предзагружает все аудиофайлы из структуры samples/
+ * Предзагружает все аудиофайлы из структуры samples/ (оптимизированная версия)
  * @param {AudioContext} audioContext - Контекст аудио
  * @param {Object} options - Опции загрузки
  * @returns {Promise<Object>} - Результат загрузки
  */
 async function preloadAllSamples(audioContext, options = {}) {
   const {
-    maxFret = 7,
-    forceReload = false
+    maxFret = 5,  // Уменьшено для оптимизации
+    forceReload = false,
+    priorityStrings = ["1e", "6E", "5A"] // Приоритетные струны для быстрой загрузки
   } = options;
   
-  // Формируем список всех файлов
-  const filePaths = [];
+  // Формируем список файлов с приоритетом
+  const priorityFilePaths = [];
+  const otherFilePaths = [];
   
   // Струны гитары
   const strings = ["6E", "5A", "4D", "3G", "2B", "1e"];
   
-  // Добавляем все файлы для каждой струны и лада
-  strings.forEach(string => {
+  // Добавляем файлы для приоритетных струн
+  priorityStrings.forEach(string => {
     for (let fret = 0; fret <= maxFret; fret++) {
-      filePaths.push(`samples/${string}/fret${fret}.mp3`);
+      priorityFilePaths.push(`samples/${string}/fret${fret}.mp3`);
     }
   });
   
-  console.log(`Предзагрузка ${filePaths.length} аудиофайлов...`);
+  // Добавляем файлы для остальных струн
+  strings.forEach(string => {
+    if (!priorityStrings.includes(string)) {
+      for (let fret = 0; fret <= maxFret; fret++) {
+        otherFilePaths.push(`samples/${string}/fret${fret}.mp3`);
+      }
+    }
+  });
   
-  return loadAndCacheAudioBuffers(audioContext, filePaths, forceReload);
+  // Сначала загружаем приоритетные файлы
+  console.log(`Предзагрузка ${priorityFilePaths.length} приоритетных аудиофайлов...`);
+  const priorityResult = await loadAndCacheAudioBuffers(audioContext, priorityFilePaths, forceReload);
+  
+  // Затем загружаем остальные файлы
+  console.log(`Предзагрузка ${otherFilePaths.length} остальных аудиофайлов...`);
+  const otherResult = await loadAndCacheAudioBuffers(audioContext, otherFilePaths, forceReload);
+  
+  // Объединяем результаты
+  const combinedResult = {
+    buffers: { ...priorityResult.buffers, ...otherResult.buffers },
+    errors: [...priorityResult.errors, ...otherResult.errors],
+    success: priorityResult.success && otherResult.success,
+    totalFiles: priorityFilePaths.length + otherFilePaths.length,
+    loadedFiles: priorityResult.loadedFiles + otherResult.loadedFiles,
+    failedFiles: priorityResult.failedFiles + otherResult.failedFiles
+  };
+  
+  console.log(`Предзагрузка завершена: ${combinedResult.loadedFiles}/${combinedResult.totalFiles} файлов загружено`);
+  
+  return combinedResult;
 }
 
 // Экспортируем функции для использования в других модулях

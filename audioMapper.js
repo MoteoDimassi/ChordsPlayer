@@ -12,8 +12,8 @@ const AUDIO_EXTENSION = '.mp3';
 // Максимальное количество полутонов для транспонирования
 const MAX_PITCH_SHIFT_SEMITONES = 2;
 
-// Порядок струн от самой низкой к самой высокой
-const AUDIO_MAPPER_STRINGS_ORDER = ["6E", "5A", "4D", "3G", "2B", "1e"];
+// Импортируем данные и функции из общего модуля
+const { STRINGS_ORDER: AUDIO_MAPPER_STRINGS_ORDER } = window.NoteUtils;
 
 /**
  * Создает беззвучный буфер для немых струн

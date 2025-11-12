@@ -376,7 +376,7 @@ footer {
     }
 }
 
-/* Стили для SVG грифа */
+/* Оптимизированные стили для SVG грифа */
 .fretboard .string {
     stroke: #333;
     stroke-width: 1;
@@ -396,6 +396,7 @@ footer {
     fill: #e74c3c;
     stroke: #c0392b;
     stroke-width: 1;
+    transition: fill 0.2s, stroke 0.2s; /* Добавляем плавный переход */
 }
 
 .fretboard .finger-position.active {
@@ -440,4 +441,27 @@ footer {
     font-weight: bold;
     text-anchor: middle;
     dominant-baseline: middle;
+}
+
+/* Оптимизированная анимация для уменьшения нагрузки на CPU */
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Оптимизация для мобильных устройств */
+@media (max-width: 768px) {
+    .fretboard {
+        max-width: 100%;
+        height: auto;
+    }
+    
+    .fretboard .string-label {
+        font-size: 10px;
+    }
+    
+    .fretboard .fret-label {
+        font-size: 8px;
+    }
 }
