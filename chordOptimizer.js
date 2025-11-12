@@ -7,7 +7,7 @@
  */
 
 // Импортируем данные и функции из общего модуля
-const { NOTES_DATA: OPTIMIZER_NOTES_DATA, STRINGS_ORDER, extractNoteName, extractOctave, calculateMidiNumber, findAllPossiblePositions } = window.NoteUtils;
+// Используем доступ через объект NoteUtils, чтобы избежать конфликтов имен
 
 // Веса для оценочной функции
 const SCORE_WEIGHTS = {
@@ -107,7 +107,7 @@ function createFullFingering(selectedPositions) {
   const fingering = [];
   
   // Проходим по всем струнам в порядке от 6-й к 1-й
-  for (const string of STRINGS_ORDER) {
+  for (const string of window.NoteUtils.STRINGS_ORDER) {
     const position = selectedPositions.find(pos => pos.string === string);
     
     if (position) {
@@ -308,13 +308,13 @@ function findLowestRootNote(rootNote) {
   let lowestMidi = Infinity;
   
   // Проходим по всем струнам и ладам
-  Object.keys(OPTIMIZER_NOTES_DATA).forEach(string => {
-    OPTIMIZER_NOTES_DATA[string].forEach((noteWithOctave, fret) => {
-      const noteName = extractNoteName(noteWithOctave);
+  Object.keys(window.NoteUtils.NOTES_DATA).forEach(string => {
+    window.NoteUtils.NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+      const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
       
       // Проверяем, является ли нота корневой
       if (noteName === rootNote) {
-        const midiNumber = calculateMidiNumber(noteWithOctave);
+        const midiNumber = window.NoteUtils.calculateMidiNumber(noteWithOctave);
         
         // Ищем самую низкую ноту
         if (midiNumber < lowestMidi) {
@@ -348,10 +348,10 @@ function findRootNoteOnOpenString(rootNote) {
   console.log(`Проверяем наличие корневой ноты "${rootNote}" на открытых струнах...`);
   
   for (const string of openStrings) {
-    const openNote = OPTIMIZER_NOTES_DATA[string][0];
+    const openNote = window.NoteUtils.NOTES_DATA[string][0];
     if (!openNote) continue;
     
-    const noteName = extractNoteName(openNote);
+    const noteName = window.NoteUtils.extractNoteName(openNote);
     
     // Если на открытой струне есть корневая нота
     if (noteName === rootNote) {
@@ -360,8 +360,8 @@ function findRootNoteOnOpenString(rootNote) {
         note: noteName,
         string: string,
         fret: 0,
-        midi: calculateMidiNumber(openNote),
-        octave: extractOctave(openNote)
+        midi: window.NoteUtils.calculateMidiNumber(openNote),
+        octave: window.NoteUtils.extractOctave(openNote)
       };
     }
   }
@@ -406,7 +406,7 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
   } else {
     // Для других струн используем упрощенный подход
     chordShape = {
-      strings: STRINGS_ORDER,
+      strings: window.NoteUtils.STRINGS_ORDER,
       degrees: [1, 3, 5, 1, 3, 5] // Общая структура
     };
   }
@@ -458,8 +458,8 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
     let foundPosition = null;
     
     // Сначала проверяем открытую струну (fret: 0) - она всегда должна рассматриваться
-    if (OPTIMIZER_NOTES_DATA[string][0]) {
-      const openNoteName = extractNoteName(OPTIMIZER_NOTES_DATA[string][0]);
+    if (window.NoteUtils.NOTES_DATA[string][0]) {
+      const openNoteName = window.NoteUtils.extractNoteName(window.NoteUtils.NOTES_DATA[string][0]);
       if (openNoteName === targetNote) {
         foundPosition = {
           string: string,
@@ -475,10 +475,10 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
         // Пропускаем лад 0, так как уже проверили
         if (fret === 0) continue;
         
-        const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+        const noteWithOctave = window.NoteUtils.NOTES_DATA[string][fret];
         if (!noteWithOctave) continue;
         
-        const noteName = extractNoteName(noteWithOctave);
+        const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
         if (noteName === targetNote) {
           foundPosition = {
             string: string,
@@ -493,8 +493,8 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
     // Если не нашли рядом с корневой нотой, ищем по всем ладам
     if (!foundPosition) {
       // Сначала проверяем открытую струну (если еще не проверена)
-      if (OPTIMIZER_NOTES_DATA[string][0]) {
-        const openNoteName = extractNoteName(OPTIMIZER_NOTES_DATA[string][0]);
+      if (window.NoteUtils.NOTES_DATA[string][0]) {
+        const openNoteName = window.NoteUtils.extractNoteName(window.NoteUtils.NOTES_DATA[string][0]);
         if (openNoteName === targetNote) {
           foundPosition = {
             string: string,
@@ -507,10 +507,10 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
       // Если не нашли на открытой струне, ищем по остальным ладам
       if (!foundPosition) {
         for (let fret = 1; fret <= 7; fret++) {
-          const noteWithOctave = OPTIMIZER_NOTES_DATA[string][fret];
+          const noteWithOctave = window.NoteUtils.NOTES_DATA[string][fret];
           if (!noteWithOctave) continue;
           
-          const noteName = extractNoteName(noteWithOctave);
+          const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
           if (noteName === targetNote) {
             foundPosition = {
               string: string,
@@ -540,7 +540,7 @@ function buildChordFromRoot(rootNote, chordNotes, rootPosition, chordName) {
     const fullFingering = [];
     
     // Проходим по всем струнам в порядке от 6-й к 1-й
-    for (const string of STRINGS_ORDER) {
+    for (const string of window.NoteUtils.STRINGS_ORDER) {
       const position = fingering.find(pos => pos.string === string);
       
       if (position) {
@@ -636,7 +636,7 @@ function findOptimalFingering(chordNotes, chordName = '', options = {}) {
   
   // Если основная аппликатура не построена, используем упрощенный поиск
   // Находим все возможные позиции для каждой ноты
-  const positionsByNote = findAllPossiblePositions(chordNotes);
+  const positionsByNote = window.NoteUtils.findAllPossiblePositions(chordNotes);
   
   // Ограничиваем количество комбинаций для оптимизации
   const maxCombinations = 50;

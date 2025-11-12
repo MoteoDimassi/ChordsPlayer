@@ -5,7 +5,7 @@
  */
 
 // Импортируем данные и функции из общего модуля
-const { NOTES_DATA, NOTE_MIDI_NUMBERS, STRINGS_ORDER, extractNoteName, extractOctave, calculateMidiNumber } = window.NoteUtils;
+// Используем доступ через объект NoteUtils, чтобы избежать конфликтов имен
 
 // Определение 5 типов аппликатур с расположением ступеней
 const CHORD_SHAPES = {
@@ -121,13 +121,13 @@ function findLowestRootNote(chordNotes) {
   let lowestMidi = Infinity;
   
   // Проходим по всем струнам и ладам
-  Object.keys(NOTES_DATA).forEach(string => {
-    NOTES_DATA[string].forEach((noteWithOctave, fret) => {
-      const noteName = extractNoteName(noteWithOctave);
+  Object.keys(window.NoteUtils.NOTES_DATA).forEach(string => {
+    window.NoteUtils.NOTES_DATA[string].forEach((noteWithOctave, fret) => {
+      const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
       
       // Проверяем, является ли нота частью аккорда
       if (chordNotes.includes(noteName)) {
-        const midiNumber = calculateMidiNumber(noteWithOctave);
+        const midiNumber = window.NoteUtils.calculateMidiNumber(noteWithOctave);
         
         // Ищем самую низкую ноту
         if (midiNumber < lowestMidi) {
@@ -137,7 +137,7 @@ function findLowestRootNote(chordNotes) {
             string: string,
             fret: fret,
             midi: midiNumber,
-            octave: extractOctave(noteWithOctave)
+            octave: window.NoteUtils.extractOctave(noteWithOctave)
           };
         }
       }
@@ -165,10 +165,10 @@ function findRootNoteOnOpenString(chordNotes) {
   console.log(`Проверяем наличие корневой ноты "${rootNote}" на открытых струнах...`);
   
   for (const string of openStrings) {
-    const openNote = NOTES_DATA[string][0];
+    const openNote = window.NoteUtils.NOTES_DATA[string][0];
     if (!openNote) continue;
     
-    const noteName = extractNoteName(openNote);
+    const noteName = window.NoteUtils.extractNoteName(openNote);
     
     // Если на открытой струне есть корневая нота
     if (noteName === rootNote) {
@@ -177,8 +177,8 @@ function findRootNoteOnOpenString(chordNotes) {
         note: noteName,
         string: string,
         fret: 0,
-        midi: calculateMidiNumber(openNote),
-        octave: extractOctave(openNote)
+        midi: window.NoteUtils.calculateMidiNumber(openNote),
+        octave: window.NoteUtils.extractOctave(openNote)
       };
     }
   }
@@ -307,17 +307,17 @@ function tryShape(chordNotes, rootNote, shape, rootPosition) {
     let foundPosition = null;
     
     for (let fret = 0; fret <= 7; fret++) {
-      const noteWithOctave = NOTES_DATA[string][fret];
+      const noteWithOctave = window.NoteUtils.NOTES_DATA[string][fret];
       if (!noteWithOctave) continue;
       
-      const noteName = extractNoteName(noteWithOctave);
+      const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
       if (noteName === targetNote) {
         foundPosition = {
           string: string,
           fret: fret,
           note: noteName,
-          midi: calculateMidiNumber(noteWithOctave),
-          octave: extractOctave(noteWithOctave)
+          midi: window.NoteUtils.calculateMidiNumber(noteWithOctave),
+          octave: window.NoteUtils.extractOctave(noteWithOctave)
         };
         break;
       }
@@ -328,17 +328,17 @@ function tryShape(chordNotes, rootNote, shape, rootPosition) {
       if (i < shape.strings.length - 1) {
         const nextString = shape.strings[i + 1];
         for (let fret = 0; fret <= 4; fret++) {
-          const noteWithOctave = NOTES_DATA[nextString][fret];
+          const noteWithOctave = window.NoteUtils.NOTES_DATA[nextString][fret];
           if (!noteWithOctave) continue;
           
-          const noteName = extractNoteName(noteWithOctave);
+          const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
           if (noteName === targetNote) {
             foundPosition = {
               string: nextString,
               fret: fret,
               note: noteName,
-              midi: calculateMidiNumber(noteWithOctave),
-              octave: extractOctave(noteWithOctave)
+              midi: window.NoteUtils.calculateMidiNumber(noteWithOctave),
+              octave: window.NoteUtils.extractOctave(noteWithOctave)
             };
             console.log(`Нота ${targetNote} перенесена со струны ${string} на ${nextString}`);
             break;
@@ -426,17 +426,17 @@ function findAllPossiblePositions(chordNotes) {
   });
   
   // Проходим по каждой струне
-  Object.keys(NOTES_DATA).forEach(string => {
+  Object.keys(window.NoteUtils.NOTES_DATA).forEach(string => {
     // Проходим по каждому ладу от 0 до 7
     for (let fret = 0; fret <= 7; fret++) {
-      const noteWithOctave = NOTES_DATA[string][fret];
+      const noteWithOctave = window.NoteUtils.NOTES_DATA[string][fret];
       if (!noteWithOctave) continue;
-      const noteName = extractNoteName(noteWithOctave);
+      const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
       
       // Проверяем, является ли нота частью аккорда
       if (chordNotes.includes(noteName)) {
-        const octave = extractOctave(noteWithOctave);
-        const midiNumber = calculateMidiNumber(noteWithOctave);
+        const octave = window.NoteUtils.extractOctave(noteWithOctave);
+        const midiNumber = window.NoteUtils.calculateMidiNumber(noteWithOctave);
         
         // Добавляем позицию в результат
         result[noteName].push({

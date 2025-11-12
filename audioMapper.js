@@ -13,7 +13,7 @@ const AUDIO_EXTENSION = '.mp3';
 const MAX_PITCH_SHIFT_SEMITONES = 2;
 
 // Импортируем данные и функции из общего модуля
-const { STRINGS_ORDER: AUDIO_MAPPER_STRINGS_ORDER } = window.NoteUtils;
+// Используем доступ через объект NoteUtils, чтобы избежать конфликтов имен
 
 /**
  * Создает беззвучный буфер для немых струн
