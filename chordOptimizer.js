@@ -184,8 +184,8 @@ function calculateBarreRequirement(fingering) {
       // Если позиции на соседних струнах, это может быть баррэ
       let isBarre = true;
       for (let i = 0; i < positions.length - 1; i++) {
-        const currentIndex = STRINGS_ORDER.indexOf(positions[i].string);
-        const nextIndex = STRINGS_ORDER.indexOf(positions[i + 1].string);
+        const currentIndex = window.NoteUtils.STRINGS_ORDER.indexOf(positions[i].string);
+        const nextIndex = window.NoteUtils.STRINGS_ORDER.indexOf(positions[i + 1].string);
         
         if (nextIndex - currentIndex > 1) {
           isBarre = false;
