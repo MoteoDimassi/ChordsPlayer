@@ -12,7 +12,7 @@
 // Веса для оценочной функции
 const SCORE_WEIGHTS = {
   fretRange: -2.0,      // Штраф за широкий диапазон ладов
-  openStrings: 1.5,     // Бонус за открытые струны
+  openStrings: 0.0,     // Убрали бонус за открытые струны
   barreChords: -1.0,    // Штраф за аккорды с баррэ
   standardChords: 2.0    // Бонус за соответствие стандартным аппликатурам
 };
@@ -265,7 +265,7 @@ function calculateScore(fingering, chordName) {
  * Определяет ступени нот в аккорде относительно тоники
  * @param {Array} chordNotes - Ноты аккорда
  * @param {string} rootNote - Тоника аккорда
- * @returns {Object} - Объект: нота -> ступень (1, 3, 5, 7 и т.д.)
+ * @returns {Object} - Объект: нота -> ступень (1, 2, 3, 4, 5, 6, 7, 8 и т.д.)
  */
 function determineNoteDegrees(chordNotes, rootNote) {
   const chromaticScale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -284,9 +284,15 @@ function determineNoteDegrees(chordNotes, rootNote) {
     let degree;
     switch (interval) {
       case 0: degree = 1; break;   // Тоника
+      case 1: degree = 2; break;   // Малая секунда
+      case 2: degree = 2; break;   // Большая секунда
       case 3: degree = 3; break;   // Малая терция
       case 4: degree = 3; break;   // Большая терция
-      case 7: degree = 5; break;   // Квинта
+      case 5: degree = 4; break;   // Чистая кварта
+      case 6: degree = 4; break;   // Увеличенная кварта/уменьшенная квинта
+      case 7: degree = 5; break;   // Чистая квинта
+      case 8: degree = 6; break;   // Малая секста
+      case 9: degree = 6; break;   // Большая секста
       case 10: degree = 7; break;  // Малая септима
       case 11: degree = 7; break;  // Большая септима
       default: degree = -1; break;  // Неопределенная ступень
@@ -333,19 +339,63 @@ function findLowestRootNote(rootNote) {
 }
 
 /**
+ * Находит самую низкую первую ступень (тонику) в пределах от нулевого до четвёртого лада
+ * Искать только на шестой, пятой и четвёртой струнах
+ * @param {string} rootNote - Тоника аккорда
+ * @returns {Object|null} - Информация о самой низкой первой ступени или null
+ */
+function findLowestFirstDegree(rootNote) {
+  // Проверяем только 6-ю, 5-ю и 4-ю струны
+  const targetStrings = ["6E", "5A", "4D"];
+  let lowestFirstDegree = null;
+  let lowestMidi = Infinity;
+  
+  console.log(`Ищем самую низкую первую ступень "${rootNote}" на струнах 6, 5, 4 в пределах ладов 0-4...`);
+  
+  for (const string of targetStrings) {
+    // Проверяем лады от 0 до 4
+    for (let fret = 0; fret <= 4; fret++) {
+      const noteWithOctave = window.NoteUtils.NOTES_DATA[string][fret];
+      if (!noteWithOctave) continue;
+      
+      const noteName = window.NoteUtils.extractNoteName(noteWithOctave);
+      
+      // Если на струне есть первая ступень (тоника)
+      if (noteName === rootNote) {
+        const midiNumber = window.NoteUtils.calculateMidiNumber(noteWithOctave);
+        
+        // Ищем самую низкую ноту
+        if (midiNumber < lowestMidi) {
+          lowestMidi = midiNumber;
+          lowestFirstDegree = {
+            note: noteName,
+            string: string,
+            fret: fret,
+            midi: midiNumber,
+            octave: window.NoteUtils.extractOctave(noteWithOctave)
+          };
+        }
+      }
+    }
+  }
+  
+  if (lowestFirstDegree) {
+    console.log(`Найдена самая низкая первая ступень "${rootNote}" на струне ${lowestFirstDegree.string}, лад ${lowestFirstDegree.fret}`);
+  } else {
+    console.log(`Первая ступень "${rootNote}" не найдена на струнах 6, 5, 4 в пределах ладов 0-4`);
+  }
+  
+  return lowestFirstDegree;
+}
+
+/**
  * Находит корневую ноту на открытой струне
- *
- * ПРАВИЛО: Если есть возможность найти корневую ноту на открытой струне,
- * тогда делать аппликатуру именно от этой ноты
- *
  * @param {string} rootNote - Тоника аккорда
  * @returns {Object|null} - Информация о корневой ноте на открытой струне или null
  */
 function findRootNoteOnOpenString(rootNote) {
   // Проверяем каждую открытую струну (лад 0)
   const openStrings = ["6E", "5A", "4D", "3G", "2B", "1e"];
-  
-  console.log(`Проверяем наличие корневой ноты "${rootNote}" на открытых струнах...`);
   
   for (const string of openStrings) {
     const openNote = window.NoteUtils.NOTES_DATA[string][0];
@@ -355,7 +405,6 @@ function findRootNoteOnOpenString(rootNote) {
     
     // Если на открытой струне есть корневая нота
     if (noteName === rootNote) {
-      console.log(`Найдена корневая нота "${rootNote}" на открытой струне ${string}`);
       return {
         note: noteName,
         string: string,
@@ -366,7 +415,6 @@ function findRootNoteOnOpenString(rootNote) {
     }
   }
   
-  console.log(`Корневая нота "${rootNote}" не найдена на открытых струнах`);
   return null;
 }
 
@@ -578,15 +626,15 @@ function findOptimalFingering(chordNotes, chordName = '', options = {}) {
   // 1. Определяем корневую ноту аккорда (тоника)
   const rootNote = chordNotes[0];
   
-  // 2. Сначала проверяем, есть ли корневая нота на открытой струне
-  const openStringRoot = findRootNoteOnOpenString(rootNote);
+  // 2. Ищем самую низкую первую ступень (тонику) на струнах 6, 5, 4 в пределах ладов 0-4
+  const lowestFirstDegree = findLowestFirstDegree(rootNote);
   
   let rootPosition;
-  if (openStringRoot) {
-    rootPosition = openStringRoot;
-    console.log(`Корневая нота "${rootNote}" найдена на открытой струне ${rootPosition.string}`);
+  if (lowestFirstDegree) {
+    rootPosition = lowestFirstDegree;
+    console.log(`Самая низкая первая ступень "${rootNote}" найдена на струне ${rootPosition.string}, лад ${rootPosition.fret}`);
   } else {
-    // Если нет на открытой струне, ищем самую низкую ноту (тонику) на грифе
+    // Если не нашли на струнах 6, 5, 4 в пределах ладов 0-4, ищем самую низкую ноту (тонику) на грифе
     rootPosition = findLowestRootNote(rootNote);
     
     if (!rootPosition) {
@@ -739,7 +787,8 @@ if (typeof module !== 'undefined' && module.exports) {
     countOpenStrings,
     calculateBarreRequirement,
     calculateStandardChordMatch,
-    findRootNoteOnOpenString
+    findRootNoteOnOpenString,
+    findLowestFirstDegree
   };
 } else {
   // Для использования в браузере
@@ -754,6 +803,7 @@ if (typeof module !== 'undefined' && module.exports) {
     countOpenStrings,
     calculateBarreRequirement,
     calculateStandardChordMatch,
-    findRootNoteOnOpenString
+    findRootNoteOnOpenString,
+    findLowestFirstDegree
   };
 }
